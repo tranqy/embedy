@@ -4,6 +4,22 @@
 
 This document outlines the technical architecture and implementation requirements for Embedy, a comprehensive toolkit for creating embeddable applications. Based on modern tooling and best practices, this architecture enables deployment across web components, React components, and iframe sandboxes while maintaining consistent functionality and complete brandability.
 
+### Architectural Philosophy: Producer vs Consumer Control
+
+**Producers (Embedy App Developers)**:
+- Build and compose their own screens, flows, and component hierarchies
+- Define all structural elements including headers, footers, and navigation
+- Implement business logic, validation rules, and data processing
+- Create custom components and integrate third-party libraries
+- Control the application's functional behavior and capabilities
+
+**Consumers (Host Applications)**:
+- Extensive visual customization through comprehensive theming
+- Brand all UI elements via CSS custom properties and design tokens
+- Configure responsive layouts, spacing, and typography
+- Apply dark mode and accessibility preferences
+- Cannot modify structural components or application flow
+
 ## Technology Stack
 
 ### Core Framework Selection
@@ -20,16 +36,21 @@ This document outlines the technical architecture and implementation requirement
 
 **Implementation**:
 ```typescript
-// Base component architecture
+// Base component architecture with producer/consumer separation
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 @customElement('embedy-base')
 export class EmbedyBase extends LitElement {
+  // Consumer controls: theming and visual customization
   @property({ type: Object }) theme = {};
   @property({ type: String }) isolationLevel = 'shadow';
   
-  static styles = css`/* Dynamic theme injection */`;
+  // Producer controls: component structure and behavior
+  protected abstract renderStructure(): TemplateResult;
+  protected abstract defineBusinessLogic(): void;
+  
+  static styles = css`/* Dynamic theme injection from consumer */`;
 }
 ```
 
@@ -116,40 +137,43 @@ const { register, handleSubmit, formState: { errors } } = useForm({
 ### Theming and Design System
 
 #### CSS Custom Properties + Design Tokens
-**Rationale**: CSS custom properties provide the most flexible and performant theming solution.
+**Rationale**: CSS custom properties provide the most flexible and performant theming solution while maintaining clear producer/consumer boundaries.
 
 **Architecture**:
 ```css
-/* Design token foundation */
+/* Design token foundation - all tokens are consumer-configurable */
 :root {
-  /* Brand tokens */
+  /* Consumer-controlled brand tokens */
   --embedy-color-primary: #007bff;
   --embedy-color-secondary: #6c757d;
   --embedy-color-success: #28a745;
   --embedy-color-danger: #dc3545;
   
-  /* Semantic tokens */
+  /* Consumer-controlled semantic tokens */
   --embedy-button-background: var(--embedy-color-primary);
   --embedy-button-color: white;
   --embedy-button-border-radius: 8px;
   
-  /* Spacing system */
+  /* Consumer-controlled spacing system */
   --embedy-space-xs: 4px;
   --embedy-space-sm: 8px;
   --embedy-space-md: 16px;
   --embedy-space-lg: 24px;
   --embedy-space-xl: 32px;
   
-  /* Typography scale */
+  /* Consumer-controlled typography scale */
   --embedy-font-family: 'Inter', system-ui, sans-serif;
   --embedy-font-size-xs: 12px;
   --embedy-font-size-sm: 14px;
   --embedy-font-size-md: 16px;
   --embedy-font-size-lg: 18px;
   --embedy-font-size-xl: 20px;
+  
+  /* Producer-defined structural tokens (not exposed to consumers) */
+  /* These control layout and component structure, not appearance */
 }
 
-/* Dark mode support */
+/* Consumer-controlled dark mode support */
 @media (prefers-color-scheme: dark) {
   :root {
     --embedy-color-background: #1a1a1a;
@@ -161,18 +185,19 @@ const { register, handleSubmit, formState: { errors } } = useForm({
 
 #### Runtime Theme Engine
 ```typescript
-// Theme management system
+// Theme management system with clear consumer boundaries
 interface ThemeConfig {
+  // All properties are consumer-controlled visual theming
   brand: {
     primaryColor: string;
     secondaryColor: string;
     fontFamily: string;
-    logoUrl?: string;
+    logoUrl?: string;  // Logo image only, not structural changes
     borderRadius: string;
   };
-  components: Record<string, CSSProperties>;
+  components: Record<string, CSSProperties>;  // Visual styles only
   layout: {
-    spacing: 'compact' | 'comfortable' | 'spacious';
+    spacing: 'compact' | 'comfortable' | 'spacious';  // Spacing, not structure
     direction: 'ltr' | 'rtl';
     maxWidth: string;
   };
@@ -183,11 +208,21 @@ interface ThemeConfig {
   };
 }
 
+// Producer-controlled configuration (not exposed to consumers)
+interface ProducerConfig {
+  components: string[];  // Which components to include
+  flows: FlowDefinition[];  // Application flow and logic
+  structure: StructureDefinition;  // Headers, footers, navigation
+  validation: ValidationRules;  // Business rules
+  integrations: IntegrationConfig;  // APIs and data sources
+}
+
 class ThemeEngine {
+  // Consumers can only update visual properties
   updateTheme(config: Partial<ThemeConfig>) {
     const root = document.documentElement;
     
-    // Update CSS custom properties
+    // Update CSS custom properties (visual only)
     Object.entries(this.flattenTheme(config)).forEach(([key, value]) => {
       root.style.setProperty(`--embedy-${key}`, value);
     });
@@ -197,7 +232,150 @@ class ThemeEngine {
       detail: config
     }));
   }
+  
+  // Producer methods for structural control (not exposed)
+  private defineStructure(structure: StructureDefinition) { /* ... */ }
+  private implementFlow(flow: FlowDefinition) { /* ... */ }
 }
+```
+
+### Navigation Isolation and Consistency
+
+#### Navigation Architecture
+**Core Principle**: Embedy applications maintain independent navigation that is visually distinct and functionally isolated from the host application.
+
+```typescript
+// Navigation isolation strategy
+interface NavigationConfig {
+  // Producer-controlled navigation structure
+  type: 'menu' | 'tabs' | 'breadcrumb' | 'stepper';
+  position: 'top' | 'left' | 'bottom' | 'embedded';
+  behavior: 'push' | 'replace' | 'overlay';
+  
+  // Isolation mechanisms
+  isolation: {
+    visualBoundary: boolean;  // Clear visual separation from host
+    stateManagement: 'internal' | 'url-hash' | 'postMessage';
+    conflictResolution: 'namespace' | 'shadow-dom' | 'iframe';
+  };
+  
+  // Consumer theming (visual only, not structural)
+  theme: {
+    backgroundColor: string;
+    borderStyle: string;
+    spacing: string;
+    typography: TypographyConfig;
+  };
+}
+
+class NavigationManager {
+  private namespace = 'embedy';
+  private currentState: NavigationState;
+  
+  // Prevent conflicts with host navigation
+  initializeNavigation(config: NavigationConfig) {
+    // Namespace all navigation events
+    this.setupEventListeners(`${this.namespace}:navigate`);
+    
+    // Create visual boundary
+    if (config.isolation.visualBoundary) {
+      this.createNavigationContainer(config);
+    }
+    
+    // Initialize state management
+    switch (config.isolation.stateManagement) {
+      case 'internal':
+        this.useInternalState();
+        break;
+      case 'url-hash':
+        this.useHashRouter(`#${this.namespace}/`);
+        break;
+      case 'postMessage':
+        this.usePostMessageRouter();
+        break;
+    }
+  }
+  
+  // Handle navigation without affecting host
+  navigate(route: string, options?: NavigationOptions) {
+    // Always scope navigation to embedy context
+    const scopedRoute = `${this.namespace}/${route}`;
+    
+    // Emit scoped navigation event
+    this.emit('embedy:before-navigate', { route: scopedRoute });
+    
+    // Update only embedy's navigation state
+    this.updateNavigationState(scopedRoute);
+    
+    // Visual feedback within embedy boundary
+    this.updateActiveIndicators(scopedRoute);
+  }
+}
+```
+
+#### Visual Boundary Requirements
+
+```css
+/* Clear visual separation for embedded navigation */
+.embedy-navigation {
+  /* Producer-defined structure */
+  position: relative;
+  z-index: var(--embedy-navigation-z-index, 100);
+  
+  /* Visual boundary (consumer can theme but not remove) */
+  border: 1px solid var(--embedy-color-navigation-border, #e0e0e0);
+  background: var(--embedy-color-navigation-bg, #ffffff);
+  box-shadow: var(--embedy-navigation-shadow, 0 2px 4px rgba(0,0,0,0.1));
+  
+  /* Ensure containment */
+  contain: layout style paint;
+  isolation: isolate;
+}
+
+/* Prevent style leakage */
+.embedy-navigation * {
+  /* Reset inherited styles from host */
+  all: unset; /* Changed from 'revert' for better browser support */
+  font-family: var(--embedy-font-family);
+}
+```
+
+#### Navigation Patterns
+
+```typescript
+// Different navigation patterns for different use cases
+export const navigationPatterns = {
+  // Embedded menu button with dropdown
+  embeddedMenu: {
+    trigger: 'menu-button',
+    overlay: 'dropdown',
+    position: 'relative',
+    conflicts: 'low'  // Minimal conflict with host
+  },
+  
+  // Tab-based navigation
+  tabNavigation: {
+    display: 'horizontal-tabs',
+    position: 'top',
+    conflicts: 'medium'  // May compete visually with host tabs
+  },
+  
+  // Sidebar navigation
+  sidebarNavigation: {
+    display: 'vertical-menu',
+    position: 'left',
+    overlay: 'push-content',
+    conflicts: 'high'  // Requires dedicated space
+  },
+  
+  // Stepper/wizard navigation
+  stepperNavigation: {
+    display: 'progress-stepper',
+    position: 'top',
+    linear: true,
+    conflicts: 'low'  // Self-contained, minimal conflict
+  }
+};
 ```
 
 ### Security and Isolation
@@ -239,14 +417,286 @@ class SecurityAdapter {
 }
 ```
 
+#### Comprehensive Security Implementation
+
+**Security Threat Model**: Embedy components must protect against XSS, clickjacking, data exfiltration, and privacy violations while maintaining functionality across isolation levels.
+
+##### Content Security Policy (CSP) Compliance
+```html
+<!-- Minimum required CSP directives for iframe embedding -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://cdn.embedy.com;
+  style-src 'self' 'unsafe-inline';
+  frame-src 'self' https://embed.embedy.com;
+  frame-ancestors 'self' https://trusted-host.com;
+  connect-src 'self' https://api.embedy.com;
+">
+
+<!-- Strict CSP for high-security environments -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self' 'nonce-{random}';
+  style-src 'self' 'nonce-{random}';
+  frame-src 'self';
+  frame-ancestors 'none';
+">
+```
+
+##### Clickjacking Protection
+```typescript
+// Iframe embedding protection
+class ClickjackingProtection {
+  static validateEmbeddingContext() {
+    // Prevent embedding in untrusted contexts
+    if (window.top !== window.self) {
+      const parentOrigin = document.referrer;
+      const allowedOrigins = ['https://trusted-host.com', 'https://partner.com'];
+      
+      if (!allowedOrigins.some(origin => parentOrigin.startsWith(origin))) {
+        throw new Error('Embedding not allowed from this origin');
+      }
+    }
+  }
+  
+  static setFrameOptions() {
+    // X-Frame-Options header equivalent
+    if (window.top === window.self) {
+      document.head.appendChild(Object.assign(document.createElement('meta'), {
+        httpEquiv: 'X-Frame-Options',
+        content: 'SAMEORIGIN'
+      }));
+    }
+  }
+}
+```
+
+##### Data Privacy and GDPR Compliance
+```typescript
+interface PrivacyConfig {
+  dataProcessingBasis: 'consent' | 'legitimate_interest' | 'contract';
+  dataRetentionDays: number;
+  anonymizeData: boolean;
+  crossBorderTransfer: boolean;
+  encryptionRequired: boolean;
+}
+
+class PrivacyManager {
+  private config: PrivacyConfig;
+  
+  validateDataHandling(formData: FormData) {
+    // Encrypt sensitive fields before transmission
+    const sensitiveFields = ['ssn', 'creditCard', 'bankAccount'];
+    
+    Object.keys(formData).forEach(key => {
+      if (sensitiveFields.includes(key)) {
+        if (!this.config.encryptionRequired) {
+          throw new Error(`Field ${key} requires encryption`);
+        }
+        formData[key] = this.encryptField(formData[key]);
+      }
+    });
+    
+    // Add privacy metadata
+    return {
+      ...formData,
+      _privacy: {
+        consentTimestamp: Date.now(),
+        processingBasis: this.config.dataProcessingBasis,
+        retentionExpiry: Date.now() + (this.config.dataRetentionDays * 86400000)
+      }
+    };
+  }
+  
+  private encryptField(value: string): string {
+    // Use Web Crypto API for client-side encryption
+    return crypto.subtle.encrypt('AES-GCM', this.getEncryptionKey(), 
+      new TextEncoder().encode(value));
+  }
+}
+```
+
 #### PostMessage Security
 
 **Library Recommendation**: **Postmate** by Dollar Shave Club
 **Rationale**: Promise-based API with built-in security validation, minimal bundle size (~1.6KB gzipped), and excellent documentation.
 
+**Enhanced Security Implementation**:
+
 ```typescript
-// Using Postmate for secure iframe communication
-import Postmate from 'postmate';
+// Secure PostMessage implementation with validation
+class SecurePostMessage {
+  private allowedOrigins: Set<string>;
+  private messageValidator: MessageValidator;
+  
+  constructor(allowedOrigins: string[]) {
+    this.allowedOrigins = new Set(allowedOrigins);
+    this.messageValidator = new MessageValidator();
+  }
+  
+  async createSecureChild(config: IframeConfig) {
+    // Enhanced Postmate configuration with security validation
+    const handshake = new Postmate({
+      container: config.container,
+      url: config.url,
+      classListArray: ['embedy-secure-iframe'],
+      
+      // Security enhancements
+      model: {
+        // Validate all incoming messages
+        validateMessage: (data: any) => {
+          return this.messageValidator.validate(data);
+        },
+        
+        // Secure data transmission
+        sendSecureData: (data: any) => {
+          const encrypted = this.encryptMessage(data);
+          return this.sendWithIntegrity(encrypted);
+        }
+      }
+    });
+    
+    return handshake.then(child => {
+      // Additional security setup
+      this.setupSecurityHeaders(child);
+      this.enableIntegrityChecking(child);
+      return child;
+    });
+  }
+  
+  private validateOrigin(origin: string): boolean {
+    return this.allowedOrigins.has(origin) || 
+           this.allowedOrigins.has('*'); // Only for development
+  }
+  
+  private encryptMessage(data: any): EncryptedMessage {
+    // Use Web Crypto API for message encryption
+    const key = crypto.getRandomValues(new Uint8Array(32));
+    return {
+      payload: crypto.subtle.encrypt('AES-GCM', key, JSON.stringify(data)),
+      timestamp: Date.now(),
+      nonce: crypto.getRandomValues(new Uint8Array(12))
+    };
+  }
+}
+
+class MessageValidator {
+  private schema: MessageSchema;
+  
+  validate(message: any): ValidationResult {
+    // Validate message structure and content
+    const schemaValidation = this.schema.safeParse(message);
+    
+    if (!schemaValidation.success) {
+      throw new SecurityError('Invalid message format', {
+        errors: schemaValidation.error.errors,
+        receivedData: message
+      });
+    }
+    
+    // Additional security checks
+    this.validateMessageSize(message);
+    this.validateMessageFrequency(message);
+    this.scanForMaliciousContent(message);
+    
+    return { valid: true, sanitizedData: schemaValidation.data };
+  }
+  
+  private scanForMaliciousContent(message: any): void {
+    // Basic XSS prevention
+    const dangerousPatterns = [
+      /<script[^>]*>.*?<\/script>/gi,
+      /javascript:/gi,
+      /on\w+\s*=/gi,
+      /data:text\/html/gi
+    ];
+    
+    const messageStr = JSON.stringify(message);
+    dangerousPatterns.forEach(pattern => {
+      if (pattern.test(messageStr)) {
+        throw new SecurityError('Potentially malicious content detected');
+      }
+    });
+  }
+}
+```
+
+##### Cross-Origin Resource Sharing (CORS) Configuration
+```typescript
+// CORS policy for API endpoints
+const corsConfig = {
+  // Production configuration
+  production: {
+    origin: ['https://trusted-partner.com', 'https://client-domain.com'],
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Embedy-Token'],
+    credentials: true,
+    maxAge: 86400 // 24 hours
+  },
+  
+  // Development configuration  
+  development: {
+    origin: true, // Allow all origins in development
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['*'],
+    credentials: true
+  }
+};
+
+class CORSValidator {
+  static validateRequest(request: Request, config: CORSConfig): boolean {
+    const origin = request.headers.get('origin');
+    
+    if (!origin) {
+      throw new SecurityError('Missing origin header');
+    }
+    
+    if (Array.isArray(config.origin)) {
+      return config.origin.includes(origin);
+    }
+    
+    return config.origin === true || config.origin === origin;
+  }
+}
+```
+
+##### Security Monitoring and Alerting
+```typescript
+class SecurityMonitor {
+  private metrics: SecurityMetrics;
+  private alertThresholds: AlertThresholds;
+  
+  logSecurityEvent(event: SecurityEvent) {
+    // Log security events for monitoring
+    console.warn('[EMBEDY SECURITY]', {
+      type: event.type,
+      severity: event.severity,
+      origin: event.origin,
+      timestamp: Date.now(),
+      userAgent: navigator.userAgent,
+      details: event.details
+    });
+    
+    // Send to monitoring service
+    this.sendToMonitoring(event);
+    
+    // Check if immediate action required
+    if (event.severity === 'high') {
+      this.triggerSecurityAlert(event);
+    }
+  }
+  
+  private triggerSecurityAlert(event: SecurityEvent) {
+    // Disable further operations if severe security threat
+    if (event.type === 'MALICIOUS_CONTENT' || event.type === 'ORIGIN_VIOLATION') {
+      this.disableEmbeddedComponent();
+      this.notifyParentWindow('SECURITY_ALERT', event);
+    }
+  }
+}
+```
+
+Using Postmate for secure iframe communication
 
 // Parent implementation
 const handshake = new Postmate({
@@ -329,11 +779,13 @@ class FeatureLoader {
 ```
 
 #### Performance Targets
-- **Initial Load**: < 50KB gzipped (core framework)
-- **Time to Interactive**: < 2 seconds on 3G
-- **Component Render**: < 16ms (60fps)
-- **Memory Usage**: < 10MB for complete form suite
-- **Bundle Analysis**: Automatic size regression detection
+- **Core Framework**: 18KB gzipped (includes polyfills for IE11+)
+- **Individual Components**: 3-8KB gzipped each
+- **Complete Form Suite**: 45KB gzipped
+- **Time to Interactive**: < 3 seconds on 3G
+- **Component Render**: < 100ms for complex forms (realistic with validation)
+- **Memory Usage**: < 15MB for complete form suite in production
+- **Bundle Analysis**: Automatic size regression detection with 10% tolerance
 
 ### Documentation and Developer Experience
 
@@ -357,23 +809,506 @@ export default {
 
 #### Type Definitions
 ```typescript
-// Complete TypeScript definitions for all APIs
+// Complete TypeScript definitions with producer/consumer separation
 export interface EmbedyComponent {
-  theme: ThemeConfig;
+  // Consumer-controlled properties
+  theme: ThemeConfig;  // Visual theming only
   isolationLevel: IsolationLevel;
+  
+  // Producer-defined callbacks (structure maintained by producer)
   onSubmit?: (data: FormData, validation: ValidationResult) => void;
   onChange?: (fieldId: string, value: unknown) => void;
   onError?: (error: FormError, context: ErrorContext) => void;
 }
 
 export interface FormConfig {
+  // Producer-controlled structure
   id: string;
   title: string;
-  fields: FieldDefinition[];
-  layout: LayoutConfig;
-  validation: ValidationConfig;
-  branding: BrandingConfig;
+  fields: FieldDefinition[];  // Producer defines fields and logic
+  layout: LayoutConfig;  // Producer defines structure, consumer themes it
+  validation: ValidationConfig;  // Producer business rules
+  
+  // Consumer-controlled branding
+  branding: BrandingConfig;  // Visual customization only
 }
+
+// Clear separation in component definition
+export interface ComponentDefinition {
+  // Producer domain: what the component does
+  producerAspects: {
+    structure: ComponentStructure;  // DOM hierarchy
+    behavior: ComponentBehavior;  // Event handlers, logic
+    dataFlow: DataFlowDefinition;  // State management
+    validation: ValidationRules;  // Business rules
+  };
+  
+  // Consumer domain: how the component looks
+  consumerAspects: {
+    theme: ThemeConfig;  // Colors, typography, spacing
+    icons: IconSet;  // Visual icons
+    labels: LabelConfig;  // Text content (i18n)
+    animations: AnimationConfig;  // Visual transitions
+  };
+}
+```
+
+## Complete API Reference
+
+### Core Component API
+
+#### EmbedyBase Component
+```typescript
+@customElement('embedy-base')
+export class EmbedyBase extends LitElement {
+  // Configuration properties
+  @property({ type: Object }) theme: ThemeConfig = {};
+  @property({ type: String }) isolationLevel: IsolationLevel = 'shadow';
+  @property({ type: String }) apiEndpoint: string = '';
+  @property({ type: String }) authToken: string = '';
+  @property({ type: Boolean }) disabled: boolean = false;
+  @property({ type: Object }) validationRules: ValidationConfig = {};
+
+  // Event callbacks with error handling
+  @property({ type: Function }) 
+  onSubmit?: (data: FormData, context: SubmissionContext) => Promise<SubmissionResult>;
+  
+  @property({ type: Function }) 
+  onChange?: (fieldId: string, value: unknown, validation: ValidationResult) => void;
+  
+  @property({ type: Function }) 
+  onError?: (error: EmbedyError, context: ErrorContext) => void;
+  
+  @property({ type: Function }) 
+  onLoad?: (component: EmbedyBase, loadTime: number) => void;
+
+  // Lifecycle methods with error boundaries
+  async connectedCallback() {
+    super.connectedCallback();
+    
+    try {
+      await this.initializeComponent();
+      this.dispatchEvent(new CustomEvent('embedy:ready', {
+        detail: { component: this, timestamp: Date.now() }
+      }));
+    } catch (error) {
+      this.handleError(error, 'INITIALIZATION_ERROR');
+    }
+  }
+
+  async disconnectedCallback() {
+    try {
+      await this.cleanup();
+    } catch (error) {
+      console.warn('Cleanup error:', error);
+    }
+    super.disconnectedCallback();
+  }
+
+  // Public API methods
+  async updateTheme(themeConfig: Partial<ThemeConfig>): Promise<void> {
+    try {
+      this.validateThemeConfig(themeConfig);
+      this.theme = { ...this.theme, ...themeConfig };
+      await this.applyTheme();
+    } catch (error) {
+      throw new EmbedyError('THEME_UPDATE_FAILED', {
+        originalError: error,
+        themeConfig,
+        currentTheme: this.theme
+      });
+    }
+  }
+
+  async validate(): Promise<ValidationResult> {
+    try {
+      const result = await this.performValidation();
+      this.dispatchEvent(new CustomEvent('embedy:validation', {
+        detail: result
+      }));
+      return result;
+    } catch (error) {
+      const validationError = new EmbedyError('VALIDATION_FAILED', {
+        originalError: error,
+        formData: this.getFormData()
+      });
+      this.handleError(validationError, 'VALIDATION_ERROR');
+      throw validationError;
+    }
+  }
+
+  async submit(): Promise<SubmissionResult> {
+    try {
+      // Pre-submission validation
+      const validationResult = await this.validate();
+      if (!validationResult.valid) {
+        throw new EmbedyError('VALIDATION_FAILED', {
+          errors: validationResult.errors
+        });
+      }
+
+      // Submit data
+      const formData = this.getFormData();
+      const result = await this.submitData(formData);
+      
+      this.dispatchEvent(new CustomEvent('embedy:submit-success', {
+        detail: { result, formData }
+      }));
+      
+      return result;
+    } catch (error) {
+      const submissionError = new EmbedyError('SUBMISSION_FAILED', {
+        originalError: error,
+        formData: this.getFormData(),
+        validationState: await this.validate().catch(() => null)
+      });
+      
+      this.handleError(submissionError, 'SUBMISSION_ERROR');
+      throw submissionError;
+    }
+  }
+
+  // Error handling
+  private handleError(error: EmbedyError, context: ErrorContext): void {
+    // Log error for debugging
+    console.error('[EMBEDY ERROR]', {
+      type: error.type,
+      message: error.message,
+      context,
+      component: this.tagName,
+      timestamp: Date.now()
+    });
+
+    // Call user-provided error handler
+    if (this.onError) {
+      try {
+        this.onError(error, context);
+      } catch (handlerError) {
+        console.error('Error in user error handler:', handlerError);
+      }
+    }
+
+    // Dispatch error event
+    this.dispatchEvent(new CustomEvent('embedy:error', {
+      detail: { error, context },
+      bubbles: true
+    }));
+
+    // Update UI to show error state
+    this.showErrorState(error);
+  }
+}
+```
+
+#### Error Types and Handling
+```typescript
+// Comprehensive error system
+export class EmbedyError extends Error {
+  constructor(
+    public type: ErrorType,
+    public details: ErrorDetails = {},
+    message?: string
+  ) {
+    super(message || EmbedyError.getDefaultMessage(type));
+    this.name = 'EmbedyError';
+  }
+
+  static getDefaultMessage(type: ErrorType): string {
+    const messages: Record<ErrorType, string> = {
+      'INITIALIZATION_ERROR': 'Failed to initialize component',
+      'VALIDATION_FAILED': 'Form validation failed',
+      'SUBMISSION_FAILED': 'Form submission failed',
+      'THEME_UPDATE_FAILED': 'Failed to update theme',
+      'NETWORK_ERROR': 'Network request failed',
+      'SECURITY_VIOLATION': 'Security policy violation',
+      'CONFIGURATION_ERROR': 'Invalid configuration provided'
+    };
+    return messages[type] || 'Unknown error occurred';
+  }
+
+  toJSON() {
+    return {
+      type: this.type,
+      message: this.message,
+      details: this.details,
+      stack: this.stack,
+      timestamp: Date.now()
+    };
+  }
+}
+
+// Error boundaries for React components
+export class EmbedyErrorBoundary extends React.Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return {
+      hasError: true,
+      error: error instanceof EmbedyError ? error : new EmbedyError(
+        'COMPONENT_ERROR',
+        { originalError: error }
+      )
+    };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Log error to monitoring service
+    this.logErrorToService(error, errorInfo);
+    
+    // Call user-provided error handler
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div className="embedy-error-state">
+          <h3>Something went wrong</h3>
+          <p>Please try refreshing the page or contact support.</p>
+          <details>
+            <summary>Error details</summary>
+            <pre>{JSON.stringify(this.state.error?.toJSON(), null, 2)}</pre>
+          </details>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+```
+
+#### Network and API Layer
+```typescript
+// Robust API client with retry logic and error handling
+export class EmbedyApiClient {
+  private baseUrl: string;
+  private authToken: string;
+  private retryConfig: RetryConfig;
+
+  constructor(config: ApiClientConfig) {
+    this.baseUrl = config.baseUrl;
+    this.authToken = config.authToken;
+    this.retryConfig = config.retryConfig || {
+      maxRetries: 3,
+      backoffMs: 1000,
+      retryableStatuses: [408, 429, 500, 502, 503, 504]
+    };
+  }
+
+  async submitForm(formData: FormData): Promise<SubmissionResult> {
+    return this.retryRequest(async () => {
+      const response = await fetch(`${this.baseUrl}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`,
+          'X-Embedy-Version': '1.0'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (!response.ok) {
+        throw new EmbedyError('SUBMISSION_FAILED', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url
+        });
+      }
+
+      return response.json();
+    });
+  }
+
+  private async retryRequest<T>(
+    requestFn: () => Promise<T>
+  ): Promise<T> {
+    let lastError: Error;
+    
+    for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
+      try {
+        return await requestFn();
+      } catch (error) {
+        lastError = error;
+        
+        // Don't retry on client errors (4xx except specific ones)
+        if (error instanceof EmbedyError && 
+            error.details.status >= 400 && 
+            error.details.status < 500 &&
+            !this.retryConfig.retryableStatuses.includes(error.details.status)) {
+          throw error;
+        }
+
+        // Wait before retry (exponential backoff)
+        if (attempt < this.retryConfig.maxRetries) {
+          const delay = this.retryConfig.backoffMs * Math.pow(2, attempt);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    throw new EmbedyError('NETWORK_ERROR', {
+      originalError: lastError,
+      attempts: this.retryConfig.maxRetries + 1
+    });
+  }
+}
+```
+
+### Integration Examples with Error Handling
+
+#### React Integration
+```typescript
+// Complete React integration example
+import { EmbedyProvider, InvoiceForm, EmbedyErrorBoundary } from '@embedy/react';
+
+function App() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<EmbedyError | null>(null);
+
+  const handleSubmit = async (data: FormData) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await apiClient.submitForm(data);
+      console.log('Form submitted successfully:', result);
+      // Handle success (redirect, show success message, etc.)
+    } catch (error) {
+      console.error('Form submission failed:', error);
+      setError(error as EmbedyError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleError = (error: EmbedyError, context: ErrorContext) => {
+    // Custom error handling logic
+    setError(error);
+    
+    // Send error to monitoring service
+    errorMonitoring.captureError(error, context);
+  };
+
+  return (
+    <EmbedyErrorBoundary 
+      onError={handleError}
+      fallback={<ErrorFallback />}>
+      <EmbedyProvider 
+        theme={customTheme}
+        apiConfig={{
+          baseUrl: process.env.REACT_APP_EMBEDY_API_URL,
+          authToken: process.env.REACT_APP_EMBEDY_TOKEN
+        }}>
+        
+        <InvoiceForm
+          onSubmit={handleSubmit}
+          onError={handleError}
+          loading={loading}
+          disabled={loading}
+          validationRules={{
+            realTimeValidation: true,
+            showErrorsOnBlur: true
+          }}
+        />
+        
+        {error && (
+          <ErrorDisplay 
+            error={error} 
+            onRetry={() => setError(null)} 
+          />
+        )}
+      </EmbedyProvider>
+    </EmbedyErrorBoundary>
+  );
+}
+```
+
+#### Web Components Integration
+```html
+<!-- Complete web components integration -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const invoiceForm = document.querySelector('embedy-invoice-form');
+  
+  // Configure error handling
+  invoiceForm.onError = (error, context) => {
+    console.error('Embedy error:', error);
+    
+    // Show user-friendly error message
+    showErrorToast(error.message);
+    
+    // Send to error tracking
+    if (window.Sentry) {
+      window.Sentry.captureException(error);
+    }
+  };
+  
+  // Configure submission handling
+  invoiceForm.onSubmit = async (data, context) => {
+    try {
+      const response = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      showSuccessMessage('Invoice created successfully!');
+      return result;
+    } catch (error) {
+      // Error will be handled by onError callback
+      throw error;
+    }
+  };
+  
+  // Handle component events
+  invoiceForm.addEventListener('embedy:validation', (event) => {
+    const { valid, errors } = event.detail;
+    updateValidationUI(valid, errors);
+  });
+  
+  invoiceForm.addEventListener('embedy:error', (event) => {
+    const { error, context } = event.detail;
+    logErrorForDebugging(error, context);
+  });
+});
+
+// Utility functions
+function showErrorToast(message) {
+  // Implementation depends on your toast library
+  console.error('Error:', message);
+}
+
+function showSuccessMessage(message) {
+  // Implementation depends on your notification system
+  console.log('Success:', message);
+}
+
+function updateValidationUI(valid, errors) {
+  // Update form validation state in UI
+  const submitButton = document.querySelector('#submit-button');
+  submitButton.disabled = !valid;
+}
+</script>
+
+<embedy-invoice-form 
+  api-endpoint="/api/invoices"
+  theme="custom-brand"
+  isolation-level="shadow">
+</embedy-invoice-form>
 ```
 
 ## Implementation Phases
