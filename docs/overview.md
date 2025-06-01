@@ -36,14 +36,7 @@ Embedy follows a clear separation of concerns: **Producers define structure and 
 ## Embedding Methods
 
 ### Web Components (Native)
-```javascript
-// Direct DOM integration with shadow DOM isolation
-<embedy-invoice-form 
-  theme="custom-brand"
-  api-endpoint="/api/invoices"
-  isolation-level="shadow">
-</embedy-invoice-form>
-```
+The web components integration method provides direct DOM integration with shadow DOM isolation. Components are defined using custom element syntax with configurable theme, API endpoint, and isolation level properties.
 
 **Use Cases:**
 - Modern browsers with native web components support
@@ -51,16 +44,16 @@ Embedy follows a clear separation of concerns: **Producers define structure and 
 - Direct DOM integration without framework dependencies
 - Shared styling with host application when desired
 
-### React Components
-```javascript
-// Framework-native integration
-import { InvoiceForm } from '@embedy/react';
+**Key Features:**
+- Shadow DOM boundary prevents style conflicts
+- Custom element registration with browser standards
+- Theme property binding for dynamic styling
+- Configurable isolation levels
 
-<InvoiceForm 
-  theme={customTheme}
-  onSubmit={handleSubmit}
-  isolationLevel="component" />
-```
+*[See Web Components examples in code-examples.md](./code-examples.md#web-components-native)*
+
+### React Components
+The React integration provides framework-native components that integrate seamlessly with React applications. Components use standard React patterns including hooks, context, and TypeScript interfaces.
 
 **Use Cases:**
 - React-based host applications
@@ -68,15 +61,16 @@ import { InvoiceForm } from '@embedy/react';
 - Direct access to React ecosystem (hooks, context, etc.)
 - Optimal bundle sharing and tree-shaking
 
+**Key Features:**
+- React Hook Form integration for validation
+- TypeScript interfaces for type safety
+- Provider pattern for configuration
+- Error boundary support
+
+*[See React Components examples in code-examples.md](./code-examples.md#react-components)*
+
 ### Iframe Sandbox
-```javascript
-// Maximum security isolation
-<embedy-iframe 
-  src="/embed/invoice-form"
-  sandbox="allow-same-origin allow-scripts"
-  theme-url="/themes/custom.css">
-</embedy-iframe>
-```
+The iframe integration method provides maximum security isolation by running the embedded application in a separate browsing context with configurable sandbox restrictions.
 
 **Use Cases:**
 - Legacy browser support
@@ -84,82 +78,62 @@ import { InvoiceForm } from '@embedy/react';
 - Third-party hosting with strict CSP policies
 - Enterprise environments with security constraints
 
+**Key Features:**
+- Sandbox attribute configuration
+- PostMessage communication
+- Cross-origin theme injection
+- Authentication token passing
+
+*[See Iframe Sandbox examples in code-examples.md](./code-examples.md#iframe-sandbox)*
+
 ## Multi-Environment Compatibility
 
 ### Environment Detection and Adaptation
 
-```javascript
-const EnvironmentDetector = {
-  detectFramework: () => {
-    return {
-      react: window.React ? window.React.version : null,
-      angular: window.ng ? 'detected' : null,
-      vue: window.Vue ? window.Vue.version : null,
-      legacy: !window.customElements
-    };
-  },
-  
-  detectConstraints: () => {
-    return {
-      cspRestrictions: !this.canUseInlineStyles(),
-      performanceBudget: this.calculateAvailableBudget(),
-      mobileEnvironment: this.isMobileWebView(),
-      accessibilityRequirements: this.detectA11yNeeds()
-    };
-  },
-  
-  detectNavigationConflicts: () => {
-    return {
-      hasHostMenuButton: this.detectHostNavigation(),
-      hasHostRouter: window.history && window.location.hash,
-      hasHostModal: this.detectModalManagement(),
-      zIndexRange: this.detectAvailableZIndex()
-    };
-  }
-};
-```
+Embedy automatically detects the host environment capabilities and constraints to optimize integration. The detection system analyzes framework presence, security policies, performance budgets, and navigation systems to determine the best configuration.
+
+**Framework Detection**: Identifies React, Angular, Vue, or legacy environments to optimize component loading and integration patterns.
+
+**Constraint Analysis**: Evaluates CSP restrictions, performance budgets, mobile environments, and accessibility requirements to adapt behavior.
+
+**Navigation Conflict Detection**: Scans for existing navigation systems, URL routing, modal management, and z-index usage to prevent conflicts.
+
+*[See Environment Detection examples in code-examples.md](./code-examples.md#environment-detection-and-adaptation)*
 
 ### Adaptive Security Model
 
-```javascript
-class SecurityAdapter {
-  constructor(hostEnvironment) {
-    this.isolationLevel = this.determineIsolationLevel(hostEnvironment);
-    this.setupSecurityBoundaries();
-  }
-  
-  determineIsolationLevel(env) {
-    if (env.hasStrictCSP || env.handlesPayments) {
-      return 'IFRAME_SANDBOX'; // Maximum isolation
-    } else if (env.hasDataPrivacyReqs) {
-      return 'SHADOW_DOM_ISOLATED'; // Style and DOM isolation
-    } else {
-      return 'COMPONENT_BOUNDARY'; // Standard component model
-    }
-  }
-}
-```
+The security adapter dynamically determines the appropriate isolation level based on host environment constraints. The system supports three levels of isolation, each optimized for different security requirements.
+
+**Isolation Levels:**
+- **IFRAME_SANDBOX**: Maximum isolation for strict CSP or payment environments
+- **SHADOW_DOM_ISOLATED**: Style and DOM isolation for privacy requirements
+- **COMPONENT_BOUNDARY**: Standard component model for normal integration
+
+**Security Features:**
+- Automatic CSP compliance detection
+- Payment processing environment adaptation
+- Data privacy requirement assessment
+- Cross-origin communication validation
+
+*[See Adaptive Security examples in code-examples.md](./code-examples.md#adaptive-security-model)*
 
 ### Progressive Feature Loading
 
-```javascript
-class FeatureManager {
-  async loadOptimalFeatureSet(capabilities) {
-    const coreFeatures = await import('./core-forms'); // 18KB (with polyfills)
-    
-    if (capabilities.hasModernBrowser && capabilities.bandwidth > '3G') {
-      await import('./advanced-validation'); // +8KB
-      await import('./rich-formatting'); // +12KB
-    }
-    
-    if (capabilities.touchDevice) {
-      await import('./mobile-optimizations'); // +5KB
-    }
-    
-    return this.assembleFormComponent(loadedFeatures);
-  }
-}
-```
+The feature management system loads components and capabilities based on browser support, network conditions, and device characteristics. This ensures optimal performance while maintaining functionality across all environments.
+
+**Loading Strategy:**
+- Core features always loaded (18KB with polyfills)
+- Advanced features conditionally loaded based on capabilities
+- Mobile optimizations for touch devices
+- Automatic fallbacks for legacy environments
+
+**Performance Optimization:**
+- Bandwidth-aware feature loading
+- Browser capability detection
+- Touch device optimizations
+- Progressive enhancement patterns
+
+*[See Progressive Loading examples in code-examples.md](./code-examples.md#progressive-feature-loading)*
 
 ## Navigation Isolation
 
@@ -168,358 +142,166 @@ Embedy applications maintain independent navigation systems that are visually di
 
 ### Navigation Patterns
 
-```javascript
-// Navigation configuration with isolation strategies
-const navigationConfig = {
-  // Embedded menu with dropdown
-  embeddedMenu: {
-    type: 'menu',
-    position: 'embedded',
-    trigger: 'menu-button',
-    isolation: {
-      visualBoundary: true,
-      stateManagement: 'internal',
-      conflictResolution: 'namespace'
-    },
-    theme: {
-      backgroundColor: 'var(--embedy-color-navigation-bg)',
-      borderColor: 'var(--embedy-color-navigation-border)',
-      shadow: 'var(--embedy-navigation-shadow)'
-    }
-  },
-  
-  // Tab navigation for multi-step forms
-  tabNavigation: {
-    type: 'tabs',
-    position: 'top',
-    behavior: 'replace',
-    isolation: {
-      visualBoundary: true,
-      stateManagement: 'url-hash',
-      conflictResolution: 'shadow-dom'
-    }
-  },
-  
-  // Stepper for wizard flows
-  stepperNavigation: {
-    type: 'stepper',
-    position: 'top',
-    linear: true,
-    isolation: {
-      visualBoundary: false, // Self-contained visual
-      stateManagement: 'internal',
-      conflictResolution: 'namespace'
-    }
-  }
-};
-```
+**Embedded Menu Navigation**: A dropdown or overlay menu system that provides navigation within the embedded component without affecting the host application's navigation state.
 
-### Visual Boundary Example
+**Tab Navigation**: Horizontal tab interface for multi-step forms or applications, with visual boundaries and scoped state management.
 
-```css
-/* Clear visual separation for embedded navigation */
-.embedy-navigation {
-  /* Visual containment */
-  border: 1px solid var(--embedy-color-navigation-border, #e0e0e0);
-  background: var(--embedy-color-navigation-bg, #ffffff);
-  box-shadow: var(--embedy-navigation-shadow, 0 2px 4px rgba(0,0,0,0.1));
-  
-  /* Ensure isolation from host styles */
-  contain: layout style paint;
-  isolation: isolate;
-  z-index: var(--embedy-navigation-z-index, 100);
-}
+**Stepper Navigation**: Linear progression interface for wizard-style flows, typically self-contained with minimal visual boundaries.
 
-/* Mobile-responsive navigation */
-@media (max-width: 768px) {
-  .embedy-navigation {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    border-top: 1px solid var(--embedy-color-navigation-border);
-    border-left: none;
-    border-right: none;
-  }
-}
-```
+**Sidebar Navigation**: Vertical menu system for complex applications requiring dedicated navigation space.
+
+**Key Isolation Features:**
+- Visual boundary enforcement
+- Namespaced event handling
+- Scoped state management
+- Conflict resolution mechanisms
+
+*[See Navigation Configuration examples in code-examples.md](./code-examples.md#navigation-isolation-examples)*
+
+### Visual Boundary Implementation
+
+Navigation components implement clear visual separation through CSS containment, isolation properties, and customizable borders. The visual boundaries are consumer-themable while maintaining producer-defined structure.
+
+**Boundary Features:**
+- CSS containment for layout and style isolation
+- Configurable borders, backgrounds, and shadows
+- Mobile-responsive positioning
+- Host style inheritance prevention
+
+*[See Visual Boundary CSS in code-examples.md](./code-examples.md#visual-boundary-css)*
 
 ### Navigation State Management
 
-```javascript
-// Isolated navigation manager
-class EmbedyNavigationManager {
-  constructor(config) {
-    this.namespace = 'embedy';
-    this.config = config;
-    this.initializeNavigation();
-  }
-  
-  initializeNavigation() {
-    // Create scoped navigation context
-    this.navigationContext = {
-      routes: this.prefixRoutes(this.config.routes),
-      currentPath: this.getCurrentPath(),
-      history: []
-    };
-    
-    // Setup isolated event handling
-    this.setupNavigationListeners();
-    
-    // Initialize visual boundaries
-    if (this.config.isolation.visualBoundary) {
-      this.createNavigationContainer();
-    }
-  }
-  
-  navigate(route, options = {}) {
-    // Always scope to embedy namespace
-    const scopedRoute = `${this.namespace}/${route}`;
-    
-    // Handle navigation based on strategy
-    switch (this.config.isolation.stateManagement) {
-      case 'internal':
-        this.updateInternalState(scopedRoute);
-        break;
-      case 'url-hash':
-        window.location.hash = `#${scopedRoute}`;
-        break;
-      case 'postMessage':
-        this.sendNavigationMessage(scopedRoute);
-        break;
-    }
-    
-    // Update visual indicators
-    this.updateActiveNavItem(scopedRoute);
-  }
-  
-  // Prevent navigation conflicts
-  setupNavigationListeners() {
-    // Use namespaced events
-    document.addEventListener(`${this.namespace}:navigate`, (e) => {
-      e.stopPropagation(); // Prevent bubbling to host
-      this.navigate(e.detail.route, e.detail.options);
-    });
-    
-    // Handle back/forward for hash routing
-    if (this.config.isolation.stateManagement === 'url-hash') {
-      window.addEventListener('hashchange', (e) => {
-        if (e.newURL.includes(`#${this.namespace}/`)) {
-          this.handleHashChange(e);
-        }
-      });
-    }
-  }
-}
+The navigation manager provides isolated state handling with multiple strategies for different integration scenarios. State can be managed internally, through URL hash routing, or via postMessage communication.
+
+**State Management Options:**
+- Internal state for component-only navigation
+- URL hash routing with namespace prefixing
+- PostMessage communication for iframe isolation
+- Event-based coordination with host applications
+
+*[See Navigation State Management in code-examples.md](./code-examples.md#navigation-state-management)*
 
 ## Comprehensive Theming System
 
 ### Multi-Level Customization
 
-```javascript
-// Theme configuration with complete brand control
-const themeConfig = {
-  // Brand identity
-  brand: {
-    primaryColor: '#007bff',
-    secondaryColor: '#6c757d',
-    fontFamily: 'Inter, system-ui, sans-serif',
-    logoUrl: '/assets/brand-logo.svg',
-    borderRadius: '8px'
-  },
-  
-  // Component-level styling
-  components: {
-    button: {
-      padding: '12px 24px',
-      fontSize: '14px',
-      fontWeight: '500',
-      background: 'var(--embedy-color-primary)',
-      border: 'none',
-      borderRadius: 'var(--embedy-border-radius)'
-    },
-    input: {
-      border: '1px solid var(--embedy-color-border)',
-      borderRadius: 'var(--embedy-border-radius)',
-      padding: '10px 12px',
-      fontSize: '14px'
-    }
-  },
-  
-  // Layout customization
-  layout: {
-    spacing: 'comfortable', // compact | comfortable | spacious
-    direction: 'ltr',
-    maxWidth: '600px'
-  },
-  
-  // Dark mode support
-  darkMode: {
-    enabled: true,
-    strategy: 'class', // class | media | manual
-    colors: {
-      background: '#1a1a1a',
-      surface: '#2d2d2d',
-      text: '#ffffff'
-    }
-  }
-};
-```
+The theming system provides hierarchical customization from brand identity through component-level styling to layout configuration. All theming is consumer-controlled while maintaining producer-defined functionality.
+
+**Theming Hierarchy:**
+- **Brand Identity**: Primary colors, typography, logos, and border radius
+- **Component Styling**: Individual component appearance and behavior
+- **Layout Configuration**: Spacing, direction, and container sizing
+- **Dark Mode Support**: Automatic and manual theme switching
+
+**Customization Scope:**
+- CSS custom properties for all visual elements
+- Runtime theme switching without re-rendering
+- Responsive design token adaptation
+- Cross-component consistency enforcement
+
+*[See Theme Configuration examples in code-examples.md](./code-examples.md#multi-level-theme-configuration)*
 
 ### CSS Custom Properties Integration
 
-```css
-/* Host application can override any design token */
-:root {
-  --embedy-color-primary: #your-brand-color;
-  --embedy-color-secondary: #6c757d;
-  --embedy-border-radius: 4px;
-  --embedy-font-family: 'Your Brand Font';
-  --embedy-spacing-unit: 8px;
-}
+The theming foundation uses CSS custom properties with a standardized naming convention. Host applications can override any design token to match their brand guidelines while maintaining functional integrity.
 
-/* Automatic dark mode support */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --embedy-color-background: #1a1a1a;
-    --embedy-color-text: #ffffff;
-  }
-}
-```
+**Variable Naming Convention**: All Embedy variables use the `--embedy-*` prefix to prevent conflicts with host application styles.
+
+**Theme Token Categories:**
+- Color tokens for all UI elements
+- Spacing tokens for consistent layout
+- Typography tokens for font configuration
+- Border and shadow tokens for visual effects
+
+**Dark Mode Support**: Automatic detection and manual override capabilities with media query integration.
+
+*[See CSS Custom Properties in code-examples.md](./code-examples.md#css-custom-properties-integration)*
 
 ### Runtime Theme Switching
 
-```javascript
-// Dynamic theme updates without re-rendering
-const embeddedForm = document.querySelector('embedy-invoice-form');
-embeddedForm.updateTheme({
-  brand: { 
-    primaryColor: '#new-color',
-    secondaryColor: '#6c757d' 
-  },
-  components: { 
-    button: { 
-      borderRadius: '12px',
-      backgroundColor: 'var(--embedy-color-primary)',
-      color: 'var(--embedy-color-on-primary)'
-    } 
-  }
-});
-```
+The theme engine supports dynamic updates without component re-rendering. Theme changes are applied immediately through CSS custom property updates with event notification.
+
+**Dynamic Capabilities:**
+- Live theme preview and testing
+- Gradual theme transitions
+- Component-specific overrides
+- Theme validation and error handling
+
+*[See Runtime Theme examples in code-examples.md](./code-examples.md#runtime-theme-switching)*
 
 ## Schema-Driven Architecture
 
 ### Declarative Configuration
 
-```json
-{
-  "$schema": "./form-schema.json",
-  "formDefinition": {
-    "id": "invoice-form",
-    "title": "Invoice Creation",
-    "theme": "brand-primary",
-    "fields": [
-      {
-        "id": "client_selection",
-        "type": "client-lookup",
-        "label": "Client",
-        "validation": {
-          "required": true,
-          "customRules": ["existing_client"]
-        },
-        "styling": {
-          "variant": "outlined",
-          "size": "medium"
-        }
-      }
-    ],
-    "layout": {
-      "type": "grid",
-      "columns": 2,
-      "gap": "16px"
-    },
-    "branding": {
-      "showLogo": true,
-      "customFooter": "Powered by Your Brand"
-    }
-  }
-}
-```
+Embedy uses JSON schemas to define form structure, validation rules, and component behavior. This approach enables declarative configuration with TypeScript inference and runtime validation.
 
-### Component Library
+**Schema Benefits:**
+- Type-safe configuration with IDE support
+- Runtime validation and error reporting
+- Version-controlled form definitions
+- Cross-platform configuration sharing
 
-```javascript
-// Producer-defined components with consumer theming points
-const FormAtoms = {
-  // Producers create the component logic and structure
-  CurrencyInput: {
-    schema: CurrencyInputSchema,
-    producerControls: ['validation', 'formatting', 'calculations'],
-    consumerTheming: ['colors', 'typography', 'spacing', 'borders'],
-    variants: ['outlined', 'filled', 'underlined'],
-    sizes: ['small', 'medium', 'large']
-  },
-  
-  // Producers define features, consumers style them
-  ClientLookup: {
-    schema: ClientLookupSchema,
-    producerControls: ['search logic', 'data fetching', 'create flow'],
-    consumerTheming: ['colors', 'typography', 'spacing', 'borders', 'shadows'],
-    features: ['search', 'create', 'recent', 'favorites'],
-    customizations: ['placeholder', 'noResults', 'createPrompt']
-  },
-  
-  // Producers implement business logic, consumers brand the UI
-  TaxCalculator: {
-    schema: TaxCalculatorSchema,
-    producerControls: ['tax rules', 'calculations', 'regional logic'],
-    consumerTheming: ['colors', 'typography', 'spacing'],
-    capabilities: ['regional', 'multi_rate', 'exemptions', 'compound'],
-    display: ['inline', 'tooltip', 'modal', 'sidebar']
-  }
-};
-```
+**Configuration Areas:**
+- Form field definitions and validation
+- Layout and presentation configuration
+- Branding and visual customization
+- Integration and API configuration
+
+*[See Declarative Configuration in code-examples.md](./code-examples.md#declarative-form-configuration)*
+
+### Component Library Architecture
+
+The component library follows atomic design principles with clear separation between producer-controlled functionality and consumer-controlled styling. Each component exposes specific theming points while maintaining encapsulated behavior.
+
+**Component Structure:**
+- **Producer Controls**: Validation, business logic, data processing, and API integration
+- **Consumer Theming**: Colors, typography, spacing, borders, and visual effects
+- **Variant System**: Predefined styling variants (outlined, filled, underlined)
+- **Size System**: Consistent sizing across components (small, medium, large)
+
+**Customization Points**: Each component provides specific styling interfaces while protecting functional implementation.
+
+*[See Component Library examples in code-examples.md](./code-examples.md#component-library-configuration)*
 
 ## Integration Examples
 
 ### Drop-in Integration
-```html
-<!-- Minimal setup with default branding -->
-<script src="https://cdn.embedy.com/embedy.js"></script>
-<embedy-invoice-form api-key="your-api-key"></embedy-invoice-form>
-```
+The simplest integration method requires only script inclusion and HTML element placement. This approach uses default branding and configuration for rapid prototyping or minimal customization needs.
+
+**Characteristics:**
+- Single script tag inclusion
+- Minimal configuration required
+- Default theming and behavior
+- CDN-hosted for easy deployment
+
+*[See Drop-in Integration in code-examples.md](./code-examples.md#drop-in-integration)*
 
 ### Fully Branded Integration
-```javascript
-// Complete white-label customization (visual theming only)
-import { EmbedyProvider, InvoiceForm } from '@embedy/react';
+Complete white-label customization allows host applications to apply comprehensive branding while maintaining producer-defined structure. This approach provides maximum visual customization within functional boundaries.
 
-const App = () => (
-  <EmbedyProvider 
-    theme={fullBrandTheme}  // Consumer controls all visual aspects
-    apiConfig={config}
-    whiteLabel={true}>
-    <InvoiceForm
-      // Note: Headers/footers are styled via theme, not replaced
-      // The producer defines the structure, consumer themes it
-      headerTheme={customHeaderStyles}
-      footerTheme={customFooterStyles}
-      onSubmit={handleSubmit} />
-  </EmbedyProvider>
-);
-```
+**Capabilities:**
+- Complete visual theme override
+- Custom brand identity integration
+- Component-level styling control
+- Layout and spacing customization
+
+**Limitations**: Structure and functionality remain producer-controlled to ensure consistent behavior and maintainability.
+
+*[See Fully Branded Integration in code-examples.md](./code-examples.md#fully-branded-integration)*
 
 ### Enterprise Security Integration
-```javascript
-// Maximum isolation with custom authentication
-<embedy-iframe
-  src="/embed/invoice-form"
-  sandbox="allow-same-origin allow-scripts allow-forms"
-  auth-token="jwt-token"
-  csp-nonce="random-nonce"
-  theme-url="https://your-domain.com/embedy-theme.css">
-</embedy-iframe>
-```
+Maximum isolation deployment for high-security environments with strict CSP policies, authentication requirements, and audit trails. This approach prioritizes security over convenience.
+
+**Security Features:**
+- Iframe sandbox isolation
+- Custom authentication integration
+- CSP-compliant resource loading
+- Audit logging and monitoring
+
+**Trade-offs**: Increased complexity in exchange for maximum security and compliance.
+
+*[See Enterprise Security Integration in code-examples.md](./code-examples.md#enterprise-security-integration)*
 
 ## Performance Characteristics
 
@@ -545,380 +327,38 @@ const App = () => (
 
 ### Common Integration Issues
 
-#### 1. Component Not Rendering
+The troubleshooting guide addresses five major categories of integration problems with systematic debugging approaches and practical solutions.
 
-**Symptoms:**
-- Embedy component appears as empty or unstyled element
-- Console shows "Custom element not defined" errors
-- Component renders but appears broken
+**Issue Categories:**
+1. **Component Rendering**: Missing definitions, loading failures, and broken display
+2. **Styling Conflicts**: CSS isolation problems, theme application failures, and visual conflicts
+3. **Navigation Conflicts**: URL routing conflicts, event handling issues, and state management problems
+4. **API Integration**: CORS errors, authentication failures, and network connectivity issues
+5. **Performance Problems**: Memory leaks, slow loading, and interaction lag
 
-**Solutions:**
-```javascript
-// Ensure Embedy is properly loaded before use
-import('@embedy/core').then(() => {
-  document.querySelector('embedy-invoice-form').style.display = 'block';
-});
+**Debugging Approach**: Each issue category includes symptom identification, systematic debugging steps, and proven solutions with code examples.
 
-// For web components, check if defined
-if (!customElements.get('embedy-invoice-form')) {
-  console.error('Embedy component not loaded');
-  // Load component definition
-  await import('@embedy/components/invoice-form');
-}
-
-// For React, ensure proper import
-import { InvoiceForm } from '@embedy/react';
-// Not: import InvoiceForm from '@embedy/react'; // ❌ Wrong
-```
-
-#### 2. Styling Issues and CSS Conflicts
-
-**Symptoms:**
-- Component appears unstyled or with wrong colors
-- Host application styles bleeding into embedded component
-- Theme changes not applying
-
-**Solutions:**
-```css
-/* Ensure proper CSS isolation */
-embedy-invoice-form {
-  /* Force CSS containment */
-  contain: layout style paint;
-  isolation: isolate;
-}
-
-/* Check for CSS custom property conflicts */
-:root {
-  /* Use proper variable naming */
-  --embedy-color-primary: #007bff; /* ✅ Correct */
-  --primary-color: #007bff; /* ❌ May conflict with host */
-}
-
-/* Debugging CSS variables */
-embedy-invoice-form {
-  /* Temporarily override to test */
-  --embedy-color-primary: red !important;
-}
-```
-
-```javascript
-// Programmatically debug theming
-const component = document.querySelector('embedy-invoice-form');
-console.log('Current theme:', component.theme);
-
-// Test theme update
-component.updateTheme({
-  brand: { primaryColor: '#ff0000' }
-}).then(() => {
-  console.log('Theme updated successfully');
-}).catch(error => {
-  console.error('Theme update failed:', error);
-});
-```
-
-#### 3. Navigation Conflicts
-
-**Symptoms:**
-- Host application navigation breaks when Embedy loads
-- Back/forward buttons don't work correctly
-- URL hash conflicts
-
-**Solutions:**
-```javascript
-// Configure navigation isolation
-const embedyNav = new EmbedyNavigationManager({
-  isolation: {
-    stateManagement: 'internal', // Use internal state instead of URL
-    conflictResolution: 'namespace' // Namespace all events
-  }
-});
-
-// Handle navigation conflicts
-window.addEventListener('hashchange', (event) => {
-  // Only handle embedy navigation
-  if (event.newURL.includes('#embedy/')) {
-    event.stopPropagation();
-    embedyNav.handleHashChange(event);
-  }
-});
-
-// Alternative: Use postMessage for iframe isolation
-if (window.top !== window.self) {
-  // We're in an iframe, use postMessage
-  embedyNav.config.isolation.stateManagement = 'postMessage';
-}
-```
-
-#### 4. API Integration Issues
-
-**Symptoms:**
-- Form submissions fail silently
-- CORS errors in console
-- Authentication failures
-
-**Solutions:**
-```javascript
-// Debug API configuration
-const apiClient = new EmbedyApiClient({
-  baseUrl: 'https://api.yourdomain.com', // ✅ Use full URL
-  authToken: 'your-token',
-  debug: true // Enable debug logging
-});
-
-// Handle CORS issues
-// Server-side configuration needed:
-/*
-Access-Control-Allow-Origin: https://yourdomain.com
-Access-Control-Allow-Methods: GET, POST, OPTIONS
-Access-Control-Allow-Headers: Content-Type, Authorization, X-Embedy-Token
-Access-Control-Allow-Credentials: true
-*/
-
-// Client-side debugging
-fetch('/api/test', {
-  method: 'OPTIONS',
-  headers: {
-    'Content-Type': 'application/json'
-  }
-}).then(response => {
-  console.log('CORS preflight:', response.headers);
-}).catch(error => {
-  console.error('CORS issue:', error);
-});
-
-// Test authentication
-apiClient.testAuth().then(() => {
-  console.log('Auth working');
-}).catch(error => {
-  console.error('Auth failed:', error);
-  // Check token expiration, refresh if needed
-});
-```
-
-#### 5. Performance Issues
-
-**Symptoms:**
-- Slow component loading
-- High memory usage
-- Laggy interactions
-
-**Solutions:**
-```javascript
-// Enable performance monitoring
-const observer = new PerformanceObserver((list) => {
-  list.getEntries().forEach((entry) => {
-    if (entry.name.includes('embedy')) {
-      console.log(`${entry.name}: ${entry.duration}ms`);
-    }
-  });
-});
-observer.observe({ entryTypes: ['measure', 'navigation'] });
-
-// Optimize bundle loading
-import('./embedy-core').then(async (core) => {
-  // Load only needed components
-  if (needsAdvancedValidation) {
-    await import('./embedy-validation');
-  }
-  
-  if (isMobile) {
-    await import('./embedy-mobile');
-  }
-});
-
-// Memory leak detection
-setInterval(() => {
-  const components = document.querySelectorAll('[data-embedy]');
-  console.log(`Active components: ${components.length}`);
-  
-  // Check for memory leaks
-  if (performance.memory) {
-    console.log('Memory usage:', {
-      used: Math.round(performance.memory.usedJSHeapSize / 1048576),
-      total: Math.round(performance.memory.totalJSHeapSize / 1048576)
-    });
-  }
-}, 10000);
-```
+*[See detailed troubleshooting code in code-examples.md](./code-examples.md#troubleshooting-code-examples)*
 
 ### Environment-Specific Issues
 
-#### Browser Compatibility
+**Browser Compatibility**: Feature detection, polyfill loading, and graceful degradation strategies for legacy browser support.
 
-```javascript
-// Check for required features
-const checkCompatibility = () => {
-  const required = {
-    customElements: 'customElements' in window,
-    shadowDOM: 'attachShadow' in Element.prototype,
-    fetch: 'fetch' in window,
-    promises: 'Promise' in window,
-    webCrypto: 'crypto' in window && 'subtle' in crypto
-  };
-  
-  const missing = Object.entries(required)
-    .filter(([key, supported]) => !supported)
-    .map(([key]) => key);
-  
-  if (missing.length > 0) {
-    console.warn('Missing browser features:', missing);
-    // Load polyfills
-    return loadPolyfills(missing);
-  }
-  
-  return Promise.resolve();
-};
+**Content Security Policy**: CSP violation detection, compliant initialization patterns, and security-first configuration approaches.
 
-// Load appropriate polyfills
-const loadPolyfills = async (missing) => {
-  const polyfills = [];
-  
-  if (missing.includes('customElements')) {
-    polyfills.push(import('@webcomponents/custom-elements'));
-  }
-  
-  if (missing.includes('fetch')) {
-    polyfills.push(import('whatwg-fetch'));
-  }
-  
-  await Promise.all(polyfills);
-};
-```
+**Development vs Production**: Environment-specific debugging tools, performance monitoring, and error reporting integration.
 
-#### Content Security Policy (CSP) Issues
-
-```javascript
-// Detect CSP violations
-document.addEventListener('securitypolicyviolation', (event) => {
-  if (event.violatedDirective.includes('script-src')) {
-    console.error('CSP Script violation:', event);
-    // Switch to CSP-compliant mode
-    window.EmbedyConfig = {
-      cspMode: true,
-      inlineStyles: false
-    };
-  }
-});
-
-// CSP-compliant initialization
-const initEmbedyCSPMode = () => {
-  // Use nonce for scripts
-  const scripts = document.querySelectorAll('script[data-embedy]');
-  scripts.forEach(script => {
-    if (!script.nonce) {
-      console.warn('Script missing nonce in CSP mode');
-    }
-  });
-  
-  // Use external stylesheets instead of inline styles
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = '/embedy-styles.css';
-  link.nonce = document.querySelector('meta[name="csp-nonce"]')?.content;
-  document.head.appendChild(link);
-};
-```
+*[See environment-specific solutions in code-examples.md](./code-examples.md#browser-compatibility-check)*
 
 ### Debugging Tools
 
-#### Development Mode
+**Development Mode**: Comprehensive logging, performance metrics, and runtime inspection tools for development environments.
 
-```javascript
-// Enable development mode
-window.EmbedyConfig = {
-  debug: true,
-  logLevel: 'verbose',
-  showPerformanceMetrics: true
-};
+**Error Reporting**: Structured error collection, monitoring service integration, and production debugging capabilities.
 
-// Runtime debugging
-const debugEmbedy = () => {
-  // List all embedy components
-  const components = document.querySelectorAll('[data-embedy], embedy-*');
-  console.table(Array.from(components).map(el => ({
-    tagName: el.tagName,
-    id: el.id,
-    theme: el.theme?.brand?.primaryColor,
-    isolation: el.isolationLevel,
-    ready: el.hasAttribute('data-embedy-ready')
-  })));
-  
-  // Check event listeners
-  const events = ['embedy:ready', 'embedy:error', 'embedy:submit'];
-  events.forEach(eventType => {
-    const listeners = document.querySelectorAll(`[data-${eventType}]`);
-    console.log(`${eventType} listeners:`, listeners.length);
-  });
-};
+**Performance Analysis**: Memory usage tracking, bundle analysis, and runtime performance monitoring.
 
-// Add to global scope for console access
-window.debugEmbedy = debugEmbedy;
-```
-
-#### Error Reporting
-
-```javascript
-// Enhanced error reporting
-class EmbedyErrorReporter {
-  static report(error, context = {}) {
-    const report = {
-      error: {
-        type: error.type || error.name,
-        message: error.message,
-        stack: error.stack
-      },
-      context: {
-        userAgent: navigator.userAgent,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        ...context
-      },
-      embedy: {
-        version: window.EmbedyVersion,
-        components: this.getActiveComponents(),
-        theme: this.getCurrentTheme()
-      }
-    };
-    
-    // Send to monitoring service
-    if (window.Sentry) {
-      window.Sentry.captureException(error, { extra: report });
-    }
-    
-    // Log for development
-    if (window.EmbedyConfig?.debug) {
-      console.group('🚨 Embedy Error Report');
-      console.error('Error:', error);
-      console.table(report.context);
-      console.log('Full report:', report);
-      console.groupEnd();
-    }
-    
-    return report;
-  }
-  
-  static getActiveComponents() {
-    return Array.from(document.querySelectorAll('[data-embedy]'))
-      .map(el => el.tagName.toLowerCase());
-  }
-  
-  static getCurrentTheme() {
-    const component = document.querySelector('[data-embedy]');
-    return component?.theme || null;
-  }
-}
-
-// Auto-attach error reporter
-window.addEventListener('error', (event) => {
-  if (event.filename?.includes('embedy')) {
-    EmbedyErrorReporter.report(event.error, {
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno
-    });
-  }
-});
-```
+*[See debugging tools in code-examples.md](./code-examples.md#development-debugging-tools)*
 
 ### Quick Fixes Checklist
 
@@ -932,3 +372,7 @@ When experiencing issues, check these items in order:
 6. **✅ Navigation**: Ensure proper isolation configuration
 7. **✅ Memory**: Monitor for memory leaks in long-running applications
 8. **✅ Error Handling**: Implement proper error boundaries and handlers
+
+---
+
+*For complete code examples and implementation details, see [code-examples.md](./code-examples.md)*
