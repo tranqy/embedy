@@ -20,13 +20,68 @@ This document contains all code examples for the Embedy toolkit, organized by fe
 
 #### Framework Integration
 ```javascript
-// Framework-native integration
+// Framework-native integration with auto-generated React wrapper
 import { InvoiceForm } from '@embedy/react';
 
 <InvoiceForm 
   theme={customTheme}
   onSubmit={handleSubmit}
-  isolationLevel="component" />
+  isolationLevel="component"
+  apiEndpoint="/api/invoices"
+  validationRules={{
+    realTimeValidation: true,
+    showErrorsOnBlur: true
+  }}
+/>
+```
+
+#### Multi-Target Component Definition
+```typescript
+// Web component that automatically generates React wrapper
+@defineEmbedyComponent<InvoiceFormProps>('embedy-invoice-form', InvoiceFormComponent)
+export class InvoiceFormComponent extends EmbedyBase implements EmbedyComponentInterface {
+  @embedyProperty({ type: String })
+  apiEndpoint: string = '';
+  
+  @embedyProperty({ type: Object })
+  validationRules: ValidationConfig = {};
+  
+  @embedyProperty({ type: Function })
+  onSubmit?: (data: FormData) => Promise<SubmissionResult>;
+  
+  async validate(): Promise<ValidationResult> {
+    const result = await this.validator.validate(this.getFormData());
+    this.dispatchEvent(new CustomEvent('embedy:validation', { detail: result }));
+    return result;
+  }
+  
+  render() {
+    return html`<div class="invoice-form"><!-- Form content --></div>`;
+  }
+}
+
+// Auto-generated React wrapper (created at build time)
+export const InvoiceForm = forwardRef<HTMLElement, InvoiceFormProps>((props, ref) => {
+  const webComponentRef = useRef<InvoiceFormComponent>(null);
+  
+  // Sync props to web component
+  useEffect(() => {
+    const element = webComponentRef.current;
+    if (element) {
+      element.theme = props.theme || {};
+      element.apiEndpoint = props.apiEndpoint || '';
+      element.validationRules = props.validationRules || {};
+    }
+  }, [props.theme, props.apiEndpoint, props.validationRules]);
+  
+  // Handle React event adaptation
+  ReactAdaptationLayer.adaptCustomEvents(webComponentRef, {
+    'embedy:submit': props.onSubmit,
+    'embedy:validation': props.onValidation
+  });
+  
+  return <embedy-invoice-form ref={mergeRefs([ref, webComponentRef])} />;
+});
 ```
 
 ### Iframe Sandbox
@@ -97,20 +152,109 @@ class SecurityAdapter {
 
 ### Progressive Feature Loading
 ```javascript
-class FeatureManager {
-  async loadOptimalFeatureSet(capabilities) {
-    const coreFeatures = await import('./core-forms'); // 18KB (with polyfills)
+// Enhanced capability detection and progressive loading
+class ProgressiveFeatureLoader {
+  constructor() {
+    this.capabilities = this.detectCapabilities();
+  }
+  
+  detectCapabilities() {
+    return {
+      bandwidth: this.detectBandwidth(), // 2G/3G/4G/wifi
+      memory: (navigator.deviceMemory || 4), // GB
+      touchDevice: 'ontouchstart' in window,
+      hasModernBrowser: this.detectModernBrowser(),
+      supportsWebComponents: 'customElements' in window
+    };
+  }
+  
+  async loadOptimalFeatureSet() {
+    // Core features (always loaded - 18KB gzipped)
+    const core = await import('./core/forms');
     
-    if (capabilities.hasModernBrowser && capabilities.bandwidth > '3G') {
-      await import('./advanced-validation'); // +8KB
-      await import('./rich-formatting'); // +12KB
+    // Progressive enhancement based on capabilities
+    const features = await Promise.allSettled([
+      this.loadAdvancedValidation(),
+      this.loadMobileOptimizations(),
+      this.loadVirtualScrolling(),
+      this.loadRichFormatting()
+    ]);
+    
+    return this.assembleLibrary(core, features.filter(r => r.status === 'fulfilled'));
+  }
+  
+  async loadAdvancedValidation() {
+    if (this.capabilities.hasModernBrowser && 
+        this.capabilities.bandwidth !== '2G' &&
+        this.capabilities.memory >= 2) {
+      return import('./features/advanced-validation'); // +8KB
+    }
+    return null;
+  }
+  
+  async loadMobileOptimizations() {
+    if (this.capabilities.touchDevice) {
+      return import('./features/mobile-optimizations'); // +5KB
+    }
+    return null;
+  }
+}
+
+// Bundle splitting with fallback loading
+class ChunkManager {
+  async loadChunk(chunkName) {
+    const fallbackPaths = [
+      `/chunks/${chunkName}.js`,
+      `/fallbacks/${chunkName}.js`,
+      `/core/minimal-${chunkName}.js`
+    ];
+    
+    for (const path of fallbackPaths) {
+      try {
+        return await import(path);
+      } catch (error) {
+        console.warn(`Failed to load chunk from ${path}, trying fallback`);
+      }
     }
     
-    if (capabilities.touchDevice) {
-      await import('./mobile-optimizations'); // +5KB
-    }
+    throw new Error(`Failed to load chunk: ${chunkName}`);
+  }
+}
+
+// Polyfill management
+class PolyfillLoader {
+  static async loadRequiredPolyfills(features = ['custom-elements', 'shadow-dom', 'fetch']) {
+    const missingFeatures = features.filter(feature => !this.isFeatureSupported(feature));
     
-    return this.assembleFormComponent(loadedFeatures);
+    if (missingFeatures.length > 0) {
+      console.info(`Loading polyfills for: ${missingFeatures.join(', ')}`);
+      await Promise.allSettled(missingFeatures.map(this.loadPolyfill));
+    }
+  }
+  
+  static isFeatureSupported(feature) {
+    const tests = {
+      'custom-elements': () => 'customElements' in window,
+      'shadow-dom': () => 'attachShadow' in Element.prototype,
+      'fetch': () => 'fetch' in window,
+      'intersection-observer': () => 'IntersectionObserver' in window
+    };
+    return tests[feature]?.() || false;
+  }
+  
+  static async loadPolyfill(feature) {
+    const polyfills = {
+      'custom-elements': () => import('@webcomponents/webcomponentsjs'),
+      'shadow-dom': () => import('@webcomponents/webcomponentsjs/webcomponents-bundle.js'),
+      'fetch': () => import('whatwg-fetch'),
+      'intersection-observer': () => import('intersection-observer')
+    };
+    
+    try {
+      await polyfills[feature]?.();
+    } catch (error) {
+      console.error(`Failed to load polyfill for ${feature}:`, error);
+    }
   }
 }
 ```

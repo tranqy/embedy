@@ -34,25 +34,12 @@ This document outlines the technical architecture and implementation requirement
 - Shadow DOM isolation with configurable encapsulation
 - Excellent browser compatibility (IE11+ with polyfills)
 
-**Implementation**:
-```typescript
-// Base component architecture with producer/consumer separation
-import { LitElement, html, css } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+**Multi-Target Architecture**:
+The framework implements a unified component interface that works across all deployment methods. Each component extends a standardized base class that provides common functionality for theming, validation, and lifecycle management. The architecture maintains clear separation between producer-controlled structure and consumer-controlled theming.
 
-@customElement('embedy-base')
-export class EmbedyBase extends LitElement {
-  // Consumer controls: theming and visual customization
-  @property({ type: Object }) theme = {};
-  @property({ type: String }) isolationLevel = 'shadow';
-  
-  // Producer controls: component structure and behavior
-  protected abstract renderStructure(): TemplateResult;
-  protected abstract defineBusinessLogic(): void;
-  
-  static styles = css`/* Dynamic theme injection from consumer */`;
-}
-```
+**Component Base Architecture**: All components inherit from a base class that defines the standard interface including validation methods, theme management, and isolation controls. The base class uses TypeScript decorators for property definition and provides abstract methods for producers to implement their specific business logic.
+
+**React Wrapper Generation**: React components are automatically generated at build time using build-time reflection. The system creates wrapper components that handle prop synchronization, event adaptation, and React-specific patterns like refs and lifecycle hooks. This ensures React developers get a native React experience while maintaining the underlying web component architecture.
 
 #### React Components: **React 18+ with Modern Patterns**
 **Rationale**: Maintain compatibility with the React ecosystem while leveraging concurrent features and modern hooks.
@@ -74,28 +61,18 @@ export class EmbedyBase extends LitElement {
 - Native ES modules in development
 - Plugin ecosystem for specialized needs
 
-**Configuration**:
-```typescript
-// vite.config.ts
-export default defineConfig({
-  build: {
-    lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
-      formats: ['es', 'umd', 'cjs'],
-      fileName: (format) => `embedy.${format}.js`
-    },
-    rollupOptions: {
-      external: ['react', 'react-dom'],
-      output: {
-        globals: {
-          react: 'React',
-          'react-dom': 'ReactDOM'
-        }
-      }
-    }
-  }
-});
-```
+**Progressive Loading Architecture**:
+The build system implements intelligent progressive loading that adapts to device capabilities and network conditions.
+
+**Capability Detection**: The system analyzes device characteristics including network speed, available memory, touch support, screen dimensions, and browser feature availability to determine optimal loading strategies.
+
+**Bundle Splitting Strategy**: Uses a three-tier approach with a core bundle containing essential functionality, feature-specific chunks loaded based on capabilities, and optimally cached vendor dependencies. The system prioritizes critical path loading while deferring advanced features for capable devices.
+
+**Polyfill Management**: Implements conditional polyfill loading based on feature detection, covering web components APIs, modern JavaScript features, and browser-specific capabilities. The system maintains compatibility across legacy and modern browsers without unnecessary overhead.
+
+**Fallback Strategy**: Provides multi-tier fallback handling including retry logic with exponential backoff, alternative CDN sources, local vendor bundles, and graceful degradation for minimal functionality in constrained environments.
+
+**Build Configuration**: The Vite configuration implements sophisticated chunking strategies that separate vendor libraries, feature modules, and individual components. This enables optimal caching and loading patterns while maintaining clear separation of concerns.
 
 ### Schema Validation and Forms
 
@@ -111,554 +88,76 @@ export default defineConfig({
 #### Form Management: **React Hook Form 7.x**
 **Rationale**: Minimal re-renders, excellent performance, and native Zod integration.
 
-**Implementation**:
-```typescript
-// Form schema definition
-const invoiceSchema = z.object({
-  client: z.object({
-    id: z.string().uuid(),
-    name: z.string().min(1, "Client name required")
-  }),
-  items: z.array(z.object({
-    description: z.string().min(1),
-    amount: z.number().positive(),
-    taxRate: z.number().min(0).max(1)
-  })).min(1, "At least one item required"),
-  total: z.number().positive()
-});
-
-// React Hook Form integration
-const { register, handleSubmit, formState: { errors } } = useForm({
-  resolver: zodResolver(invoiceSchema),
-  mode: 'onChange'
-});
-```
+**Implementation**: Forms use declarative schema definitions with nested object validation, array validation with minimum requirements, and comprehensive error messaging. The system integrates with React Hook Form using resolver patterns that provide real-time validation feedback and seamless error state management.
 
 ### Theming and Design System
 
 #### CSS Custom Properties + Design Tokens
 **Rationale**: CSS custom properties provide the most flexible and performant theming solution while maintaining clear producer/consumer boundaries.
 
-**Architecture**:
-```css
-/* Design token foundation - all tokens are consumer-configurable */
-:root {
-  /* Consumer-controlled brand tokens */
-  --embedy-color-primary: #007bff;
-  --embedy-color-secondary: #6c757d;
-  --embedy-color-success: #28a745;
-  --embedy-color-danger: #dc3545;
-  
-  /* Consumer-controlled semantic tokens */
-  --embedy-button-background: var(--embedy-color-primary);
-  --embedy-button-color: white;
-  --embedy-button-border-radius: 8px;
-  
-  /* Consumer-controlled spacing system */
-  --embedy-space-xs: 4px;
-  --embedy-space-sm: 8px;
-  --embedy-space-md: 16px;
-  --embedy-space-lg: 24px;
-  --embedy-space-xl: 32px;
-  
-  /* Consumer-controlled typography scale */
-  --embedy-font-family: 'Inter', system-ui, sans-serif;
-  --embedy-font-size-xs: 12px;
-  --embedy-font-size-sm: 14px;
-  --embedy-font-size-md: 16px;
-  --embedy-font-size-lg: 18px;
-  --embedy-font-size-xl: 20px;
-  
-  /* Producer-defined structural tokens (not exposed to consumers) */
-  /* These control layout and component structure, not appearance */
-}
-
-/* Consumer-controlled dark mode support */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --embedy-color-background: #1a1a1a;
-    --embedy-color-surface: #2d2d2d;
-    --embedy-color-text: #ffffff;
-  }
-}
-```
+**Architecture**: The theming system uses CSS custom properties as the foundation, implementing a comprehensive design token system that maintains clear boundaries between consumer and producer control. The system includes brand tokens for colors and identity, semantic tokens that map to specific UI elements, and a structured spacing and typography scale. Producer-defined structural tokens control layout and component hierarchy but are not exposed to consumers. Dark mode support is implemented through CSS media queries with automatic token switching.
 
 #### Runtime Theme Engine
-```typescript
-// Theme management system with clear consumer boundaries
-interface ThemeConfig {
-  // All properties are consumer-controlled visual theming
-  brand: {
-    primaryColor: string;
-    secondaryColor: string;
-    fontFamily: string;
-    logoUrl?: string;  // Logo image only, not structural changes
-    borderRadius: string;
-  };
-  components: Record<string, CSSProperties>;  // Visual styles only
-  layout: {
-    spacing: 'compact' | 'comfortable' | 'spacious';  // Spacing, not structure
-    direction: 'ltr' | 'rtl';
-    maxWidth: string;
-  };
-  darkMode: {
-    enabled: boolean;
-    strategy: 'class' | 'media' | 'manual';
-    colors: Record<string, string>;
-  };
-}
+The theme management system maintains strict boundaries between consumer and producer control. Consumer configuration includes brand identity elements, component visual styling, layout preferences for spacing and direction, and dark mode settings. Producer configuration controls structural elements like component inclusion, application flows, headers and navigation, business validation rules, and API integrations.
 
-// Producer-controlled configuration (not exposed to consumers)
-interface ProducerConfig {
-  components: string[];  // Which components to include
-  flows: FlowDefinition[];  // Application flow and logic
-  structure: StructureDefinition;  // Headers, footers, navigation
-  validation: ValidationRules;  // Business rules
-  integrations: IntegrationConfig;  // APIs and data sources
-}
-
-class ThemeEngine {
-  // Consumers can only update visual properties
-  updateTheme(config: Partial<ThemeConfig>) {
-    const root = document.documentElement;
-    
-    // Update CSS custom properties (visual only)
-    Object.entries(this.flattenTheme(config)).forEach(([key, value]) => {
-      root.style.setProperty(`--embedy-${key}`, value);
-    });
-    
-    // Trigger theme change event
-    window.dispatchEvent(new CustomEvent('embedy:theme-change', {
-      detail: config
-    }));
-  }
-  
-  // Producer methods for structural control (not exposed)
-  private defineStructure(structure: StructureDefinition) { /* ... */ }
-  private implementFlow(flow: FlowDefinition) { /* ... */ }
-}
-```
+The ThemeEngine class provides methods for consumers to update visual properties by modifying CSS custom properties dynamically. Theme changes trigger events for reactive updates while maintaining isolation of structural controls that remain under producer management.
 
 ### Navigation Isolation and Consistency
 
 #### Navigation Architecture
 **Core Principle**: Embedy applications maintain independent navigation that is visually distinct and functionally isolated from the host application.
 
-```typescript
-// Navigation isolation strategy
-interface NavigationConfig {
-  // Producer-controlled navigation structure
-  type: 'menu' | 'tabs' | 'breadcrumb' | 'stepper';
-  position: 'top' | 'left' | 'bottom' | 'embedded';
-  behavior: 'push' | 'replace' | 'overlay';
-  
-  // Isolation mechanisms
-  isolation: {
-    visualBoundary: boolean;  // Clear visual separation from host
-    stateManagement: 'internal' | 'url-hash' | 'postMessage';
-    conflictResolution: 'namespace' | 'shadow-dom' | 'iframe';
-  };
-  
-  // Consumer theming (visual only, not structural)
-  theme: {
-    backgroundColor: string;
-    borderStyle: string;
-    spacing: string;
-    typography: TypographyConfig;
-  };
-}
+The navigation isolation strategy defines producer-controlled structure including navigation type, position, and behavior, along with isolation mechanisms for visual boundaries, state management, and conflict resolution. Consumer theming controls visual aspects like colors, borders, spacing, and typography without affecting structural elements.
 
-class NavigationManager {
-  private namespace = 'embedy';
-  private currentState: NavigationState;
-  
-  // Prevent conflicts with host navigation
-  initializeNavigation(config: NavigationConfig) {
-    // Namespace all navigation events
-    this.setupEventListeners(`${this.namespace}:navigate`);
-    
-    // Create visual boundary
-    if (config.isolation.visualBoundary) {
-      this.createNavigationContainer(config);
-    }
-    
-    // Initialize state management
-    switch (config.isolation.stateManagement) {
-      case 'internal':
-        this.useInternalState();
-        break;
-      case 'url-hash':
-        this.useHashRouter(`#${this.namespace}/`);
-        break;
-      case 'postMessage':
-        this.usePostMessageRouter();
-        break;
-    }
-  }
-  
-  // Handle navigation without affecting host
-  navigate(route: string, options?: NavigationOptions) {
-    // Always scope navigation to embedy context
-    const scopedRoute = `${this.namespace}/${route}`;
-    
-    // Emit scoped navigation event
-    this.emit('embedy:before-navigate', { route: scopedRoute });
-    
-    // Update only embedy's navigation state
-    this.updateNavigationState(scopedRoute);
-    
-    // Visual feedback within embedy boundary
-    this.updateActiveIndicators(scopedRoute);
-  }
-}
-```
+The NavigationManager class implements conflict prevention by namespacing all navigation events and maintaining independent state. It supports multiple state management strategies including internal state, URL hash routing, and postMessage communication. Navigation operations are scoped to the embedy context to prevent interference with host application routing.
 
 #### Visual Boundary Requirements
 
-```css
-/* Clear visual separation for embedded navigation */
-.embedy-navigation {
-  /* Producer-defined structure */
-  position: relative;
-  z-index: var(--embedy-navigation-z-index, 100);
-  
-  /* Visual boundary (consumer can theme but not remove) */
-  border: 1px solid var(--embedy-color-navigation-border, #e0e0e0);
-  background: var(--embedy-color-navigation-bg, #ffffff);
-  box-shadow: var(--embedy-navigation-shadow, 0 2px 4px rgba(0,0,0,0.1));
-  
-  /* Ensure containment */
-  contain: layout style paint;
-  isolation: isolate;
-}
-
-/* Prevent style leakage */
-.embedy-navigation * {
-  /* Reset inherited styles from host */
-  all: unset; /* Changed from 'revert' for better browser support */
-  font-family: var(--embedy-font-family);
-}
-```
+Visual boundary requirements include producer-defined positioning and z-index management, consumer-themeable borders and backgrounds with fallback values, and containment properties to prevent style leakage. Style isolation is achieved through CSS containment and style resets that prevent inheritance from host applications while maintaining component functionality.
 
 #### Navigation Patterns
 
-```typescript
-// Different navigation patterns for different use cases
-export const navigationPatterns = {
-  // Embedded menu button with dropdown
-  embeddedMenu: {
-    trigger: 'menu-button',
-    overlay: 'dropdown',
-    position: 'relative',
-    conflicts: 'low'  // Minimal conflict with host
-  },
-  
-  // Tab-based navigation
-  tabNavigation: {
-    display: 'horizontal-tabs',
-    position: 'top',
-    conflicts: 'medium'  // May compete visually with host tabs
-  },
-  
-  // Sidebar navigation
-  sidebarNavigation: {
-    display: 'vertical-menu',
-    position: 'left',
-    overlay: 'push-content',
-    conflicts: 'high'  // Requires dedicated space
-  },
-  
-  // Stepper/wizard navigation
-  stepperNavigation: {
-    display: 'progress-stepper',
-    position: 'top',
-    linear: true,
-    conflicts: 'low'  // Self-contained, minimal conflict
-  }
-};
-```
+Navigation patterns are designed with varying levels of host conflict consideration. Embedded menus use relative positioning with minimal conflict potential, tab navigation may compete visually with host tabs, sidebar navigation requires dedicated space and has higher conflict potential, and stepper navigation is self-contained with minimal host interference. Each pattern defines appropriate positioning, display methods, and conflict mitigation strategies.
 
 ### Security and Isolation
 
 #### Iframe Sandboxing
 **Implementation based on modern security best practices**:
 
-```typescript
-// Security adapter based on environment detection
-class SecurityAdapter {
-  private readonly sandboxConfig = {
-    IFRAME_SANDBOX: [
-      'allow-same-origin',
-      'allow-scripts',
-      'allow-forms',
-      'allow-popups'
-    ],
-    SHADOW_DOM_ISOLATED: {
-      mode: 'closed',
-      delegatesFocus: true
-    },
-    COMPONENT_BOUNDARY: {
-      isolation: 'style-only'
-    }
-  };
-
-  determineSandboxLevel(environment: HostEnvironment): IsolationLevel {
-    // Enhanced detection based on modern security requirements
-    if (environment.hasStrictCSP || environment.handlesPayments) {
-      return 'IFRAME_SANDBOX';
-    }
-    
-    if (environment.hasDataPrivacyReqs || environment.isThirdParty) {
-      return 'SHADOW_DOM_ISOLATED';
-    }
-    
-    return 'COMPONENT_BOUNDARY';
-  }
-}
-```
+The SecurityAdapter implements environment-based isolation level detection. It maintains predefined configurations for each security level including iframe sandbox permissions, shadow DOM settings, and component boundary isolation. The system automatically determines appropriate isolation based on Content Security Policy constraints, payment handling requirements, data privacy needs, and third-party embedding context.
 
 #### Comprehensive Security Implementation
 
 **Security Threat Model**: Embedy components must protect against XSS, clickjacking, data exfiltration, and privacy violations while maintaining functionality across isolation levels.
 
 ##### Content Security Policy (CSP) Compliance
-```html
-<!-- Minimum required CSP directives for iframe embedding -->
-<meta http-equiv="Content-Security-Policy" content="
-  default-src 'self';
-  script-src 'self' 'unsafe-inline' https://cdn.embedy.com;
-  style-src 'self' 'unsafe-inline';
-  frame-src 'self' https://embed.embedy.com;
-  frame-ancestors 'self' https://trusted-host.com;
-  connect-src 'self' https://api.embedy.com;
-">
-
-<!-- Strict CSP for high-security environments -->
-<meta http-equiv="Content-Security-Policy" content="
-  default-src 'none';
-  script-src 'self' 'nonce-{random}';
-  style-src 'self' 'nonce-{random}';
-  frame-src 'self';
-  frame-ancestors 'none';
-">
-```
+The system supports both standard and strict CSP implementations. Standard CSP allows necessary sources for embedded content including CDN resources, API endpoints, and trusted frame ancestors. Strict CSP for high-security environments uses nonce-based script and style loading with minimal allowed sources and restricted frame embedding.
 
 ##### Clickjacking Protection
-```typescript
-// Iframe embedding protection
-class ClickjackingProtection {
-  static validateEmbeddingContext() {
-    // Prevent embedding in untrusted contexts
-    if (window.top !== window.self) {
-      const parentOrigin = document.referrer;
-      const allowedOrigins = ['https://trusted-host.com', 'https://partner.com'];
-      
-      if (!allowedOrigins.some(origin => parentOrigin.startsWith(origin))) {
-        throw new Error('Embedding not allowed from this origin');
-      }
-    }
-  }
-  
-  static setFrameOptions() {
-    // X-Frame-Options header equivalent
-    if (window.top === window.self) {
-      document.head.appendChild(Object.assign(document.createElement('meta'), {
-        httpEquiv: 'X-Frame-Options',
-        content: 'SAMEORIGIN'
-      }));
-    }
-  }
-}
-```
+Clickjacking protection implements embedding context validation by checking frame hierarchy and validating parent origins against allowlists. The system sets appropriate frame options headers and provides runtime validation to prevent unauthorized embedding. Protection includes both client-side detection and server-side header configuration for comprehensive security coverage.
 
 ##### Data Privacy and GDPR Compliance
-```typescript
-interface PrivacyConfig {
-  dataProcessingBasis: 'consent' | 'legitimate_interest' | 'contract';
-  dataRetentionDays: number;
-  anonymizeData: boolean;
-  crossBorderTransfer: boolean;
-  encryptionRequired: boolean;
-}
-
-class PrivacyManager {
-  private config: PrivacyConfig;
-  
-  validateDataHandling(formData: FormData) {
-    // Encrypt sensitive fields before transmission
-    const sensitiveFields = ['ssn', 'creditCard', 'bankAccount'];
-    
-    Object.keys(formData).forEach(key => {
-      if (sensitiveFields.includes(key)) {
-        if (!this.config.encryptionRequired) {
-          throw new Error(`Field ${key} requires encryption`);
-        }
-        formData[key] = this.encryptField(formData[key]);
-      }
-    });
-    
-    // Add privacy metadata
-    return {
-      ...formData,
-      _privacy: {
-        consentTimestamp: Date.now(),
-        processingBasis: this.config.dataProcessingBasis,
-        retentionExpiry: Date.now() + (this.config.dataRetentionDays * 86400000)
-      }
-    };
-  }
-  
-  private encryptField(value: string): string {
-    // Use Web Crypto API for client-side encryption
-    return crypto.subtle.encrypt('AES-GCM', this.getEncryptionKey(), 
-      new TextEncoder().encode(value));
-  }
-}
-```
+Privacy management includes configurable data processing basis, retention policies, anonymization options, cross-border transfer controls, and encryption requirements. The PrivacyManager validates data handling by identifying sensitive fields, applying required encryption, and adding privacy metadata including consent timestamps and retention policies. Client-side encryption uses the Web Crypto API for sensitive data protection before transmission.
 
 #### PostMessage Security
 
 **Library Recommendation**: **Postmate** by Dollar Shave Club
 **Rationale**: Promise-based API with built-in security validation, minimal bundle size (~1.6KB gzipped), and excellent documentation.
 
-**Enhanced Security Implementation**:
+**Multi-Layered Security Architecture**:
 
-```typescript
-// Secure PostMessage implementation with validation
-class SecurePostMessage {
-  private allowedOrigins: Set<string>;
-  private messageValidator: MessageValidator;
-  
-  constructor(allowedOrigins: string[]) {
-    this.allowedOrigins = new Set(allowedOrigins);
-    this.messageValidator = new MessageValidator();
-  }
-  
-  async createSecureChild(config: IframeConfig) {
-    // Enhanced Postmate configuration with security validation
-    const handshake = new Postmate({
-      container: config.container,
-      url: config.url,
-      classListArray: ['embedy-secure-iframe'],
-      
-      // Security enhancements
-      model: {
-        // Validate all incoming messages
-        validateMessage: (data: any) => {
-          return this.messageValidator.validate(data);
-        },
-        
-        // Secure data transmission
-        sendSecureData: (data: any) => {
-          const encrypted = this.encryptMessage(data);
-          return this.sendWithIntegrity(encrypted);
-        }
-      }
-    });
-    
-    return handshake.then(child => {
-      // Additional security setup
-      this.setupSecurityHeaders(child);
-      this.enableIntegrityChecking(child);
-      return child;
-    });
-  }
-  
-  private validateOrigin(origin: string): boolean {
-    return this.allowedOrigins.has(origin) || 
-           this.allowedOrigins.has('*'); // Only for development
-  }
-  
-  private encryptMessage(data: any): EncryptedMessage {
-    // Use Web Crypto API for message encryption
-    const key = crypto.getRandomValues(new Uint8Array(32));
-    return {
-      payload: crypto.subtle.encrypt('AES-GCM', key, JSON.stringify(data)),
-      timestamp: Date.now(),
-      nonce: crypto.getRandomValues(new Uint8Array(12))
-    };
-  }
-}
+**Origin Validation**: Multi-tier validation with allowlists, pattern matching, subdomain validation, and runtime verification. Supports strict mode for high-security environments and maintains blocked origin lists.
 
-class MessageValidator {
-  private schema: MessageSchema;
-  
-  validate(message: any): ValidationResult {
-    // Validate message structure and content
-    const schemaValidation = this.schema.safeParse(message);
-    
-    if (!schemaValidation.success) {
-      throw new SecurityError('Invalid message format', {
-        errors: schemaValidation.error.errors,
-        receivedData: message
-      });
-    }
-    
-    // Additional security checks
-    this.validateMessageSize(message);
-    this.validateMessageFrequency(message);
-    this.scanForMaliciousContent(message);
-    
-    return { valid: true, sanitizedData: schemaValidation.data };
-  }
-  
-  private scanForMaliciousContent(message: any): void {
-    // Basic XSS prevention
-    const dangerousPatterns = [
-      /<script[^>]*>.*?<\/script>/gi,
-      /javascript:/gi,
-      /on\w+\s*=/gi,
-      /data:text\/html/gi
-    ];
-    
-    const messageStr = JSON.stringify(message);
-    dangerousPatterns.forEach(pattern => {
-      if (pattern.test(messageStr)) {
-        throw new SecurityError('Potentially malicious content detected');
-      }
-    });
-  }
-}
-```
+**Encryption Key Management**: Uses Web Crypto API with PBKDF2 key derivation, unique IVs per encryption, session-based salt generation, and secure key rotation. Keys are non-extractable and cached per field type and context.
+
+**CSP Compliance**: Server-provided nonce support, strict mode detection, dynamic script/style creation with nonce application, and CSS custom property fallbacks for inline style restrictions.
+
+**Clickjacking Protection**: Frame ancestor validation, visual embedding indicators, depth validation, parent communication handshakes, and graceful handling of legitimate embedding scenarios.
+
+**Enhanced Security Implementation**: The SecurePostMessage class implements comprehensive message validation with allowlist-based origin checking, schema validation, and malicious content scanning. It extends Postmate with additional security layers including message encryption, integrity checking, and security header management. The MessageValidator performs structure validation, size limits, frequency checking, and XSS pattern detection to prevent malicious content transmission.
 
 ##### Cross-Origin Resource Sharing (CORS) Configuration
-```typescript
-// CORS policy for API endpoints
-const corsConfig = {
-  // Production configuration
-  production: {
-    origin: ['https://trusted-partner.com', 'https://client-domain.com'],
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Embedy-Token'],
-    credentials: true,
-    maxAge: 86400 // 24 hours
-  },
-  
-  // Development configuration  
-  development: {
-    origin: true, // Allow all origins in development
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['*'],
-    credentials: true
-  }
-};
-
-class CORSValidator {
-  static validateRequest(request: Request, config: CORSConfig): boolean {
-    const origin = request.headers.get('origin');
-    
-    if (!origin) {
-      throw new SecurityError('Missing origin header');
-    }
-    
-    if (Array.isArray(config.origin)) {
-      return config.origin.includes(origin);
-    }
-    
-    return config.origin === true || config.origin === origin;
-  }
-}
-```
+CORS policies are configured differently for production and development environments. Production configuration uses strict origin allowlists, limited HTTP methods, specific headers, and appropriate cache settings. Development configuration allows broader access for testing while maintaining credential security. The CORSValidator ensures proper origin validation and header verification for all cross-origin requests.
 
 ##### Security Monitoring and Alerting
 ```typescript
@@ -696,44 +195,7 @@ class SecurityMonitor {
 }
 ```
 
-Using Postmate for secure iframe communication
-
-// Parent implementation
-const handshake = new Postmate({
-  container: document.getElementById('iframe-container'),
-  url: 'https://child-origin.com/iframe.html',
-  classListArray: ['custom-iframe-class']
-});
-
-handshake.then(child => {
-  // Listen to events from child
-  child.on('form-submitted', data => {
-    console.log('Received form data:', data);
-  });
-  
-  // Send data to child
-  child.call('updateTheme', { primaryColor: '#007bff' });
-});
-
-// Child iframe implementation  
-const handshake = new Postmate.Model({
-  // Expose methods to parent
-  updateTheme: (themeConfig) => {
-    applyTheme(themeConfig);
-    return 'Theme updated successfully';
-  },
-  
-  // Expose data to parent
-  getFormData: () => {
-    return currentFormState;
-  }
-});
-
-// Emit events to parent
-handshake.then(parent => {
-  parent.emit('form-submitted', formData);
-});
-```
+**Postmate Implementation**: Parent-child iframe communication uses Postmate's promise-based API with container targeting, URL specification, and custom styling. The parent listens for events from the child iframe and can call exposed methods for theme updates. The child iframe implementation creates a model with exposed methods for parent communication and can emit events back to the parent for data transmission.
 
 **Alternative Libraries**:
 - **PostMessenger**: Simple wrapper with domain verification (~1.5KB)
@@ -749,34 +211,7 @@ handshake.then(parent => {
 ### Performance Optimization
 
 #### Bundle Splitting Strategy
-```typescript
-// Dynamic imports for progressive enhancement
-class FeatureLoader {
-  private capabilities: DeviceCapabilities;
-
-  async loadOptimalFeatureSet(): Promise<ComponentLibrary> {
-    // Core features (always loaded)
-    const core = await import('./core/forms');
-    
-    // Progressive enhancement based on capabilities
-    const features = await Promise.all([
-      this.capabilities.hasModernBrowser && this.capabilities.bandwidth > '3G' 
-        ? import('./features/advanced-validation')
-        : Promise.resolve(null),
-      
-      this.capabilities.touchDevice 
-        ? import('./features/mobile-optimizations')
-        : Promise.resolve(null),
-        
-      this.capabilities.supportsIntersectionObserver
-        ? import('./features/virtual-scrolling')
-        : Promise.resolve(null)
-    ]);
-
-    return this.assembleLibrary(core, features.filter(Boolean));
-  }
-}
-```
+Dynamic imports enable progressive enhancement based on device capabilities. The FeatureLoader analyzes browser capabilities, bandwidth, and device type to determine optimal feature loading. Core features are always loaded while advanced features like validation, mobile optimizations, and virtual scrolling are conditionally imported based on capability detection. The system assembles the final component library from core and available features.
 
 #### Performance Targets
 - **Core Framework**: 18KB gzipped (includes polyfills for IE11+)
@@ -790,526 +225,31 @@ class FeatureLoader {
 ### Documentation and Developer Experience
 
 #### Storybook 8.x Configuration
-```typescript
-// .storybook/main.ts
-export default {
-  framework: '@storybook/web-components-vite',
-  stories: ['../src/**/*.stories.@(js|jsx|ts|tsx|mdx)'],
-  addons: [
-    '@storybook/addon-essentials',
-    '@storybook/addon-a11y',
-    '@storybook/addon-design-tokens'
-  ],
-  docs: {
-    autodocs: 'tag',
-    defaultName: 'Documentation'
-  }
-};
-```
+Storybook documentation uses the web-components-vite framework with comprehensive story discovery across multiple file types. Essential addons provide core functionality, accessibility testing ensures compliance, and design token integration maintains visual consistency. Automatic documentation generation creates comprehensive component reference materials.
 
 #### Type Definitions
-```typescript
-// Complete TypeScript definitions with producer/consumer separation
-export interface EmbedyComponent {
-  // Consumer-controlled properties
-  theme: ThemeConfig;  // Visual theming only
-  isolationLevel: IsolationLevel;
-  
-  // Producer-defined callbacks (structure maintained by producer)
-  onSubmit?: (data: FormData, validation: ValidationResult) => void;
-  onChange?: (fieldId: string, value: unknown) => void;
-  onError?: (error: FormError, context: ErrorContext) => void;
-}
-
-export interface FormConfig {
-  // Producer-controlled structure
-  id: string;
-  title: string;
-  fields: FieldDefinition[];  // Producer defines fields and logic
-  layout: LayoutConfig;  // Producer defines structure, consumer themes it
-  validation: ValidationConfig;  // Producer business rules
-  
-  // Consumer-controlled branding
-  branding: BrandingConfig;  // Visual customization only
-}
-
-// Clear separation in component definition
-export interface ComponentDefinition {
-  // Producer domain: what the component does
-  producerAspects: {
-    structure: ComponentStructure;  // DOM hierarchy
-    behavior: ComponentBehavior;  // Event handlers, logic
-    dataFlow: DataFlowDefinition;  // State management
-    validation: ValidationRules;  // Business rules
-  };
-  
-  // Consumer domain: how the component looks
-  consumerAspects: {
-    theme: ThemeConfig;  // Colors, typography, spacing
-    icons: IconSet;  // Visual icons
-    labels: LabelConfig;  // Text content (i18n)
-    animations: AnimationConfig;  // Visual transitions
-  };
-}
-```
+Comprehensive TypeScript definitions maintain strict producer/consumer separation. The EmbedyComponent interface provides consumer-controlled theming and isolation properties alongside producer-defined callback structure. FormConfig separates producer-controlled structure including fields, layout, and validation from consumer-controlled branding. ComponentDefinition clearly delineates producer aspects covering functionality and structure from consumer aspects covering visual presentation and user experience.
 
 ## Complete API Reference
 
 ### Core Component API
 
 #### EmbedyBase Component
-```typescript
-@customElement('embedy-base')
-export class EmbedyBase extends LitElement {
-  // Configuration properties
-  @property({ type: Object }) theme: ThemeConfig = {};
-  @property({ type: String }) isolationLevel: IsolationLevel = 'shadow';
-  @property({ type: String }) apiEndpoint: string = '';
-  @property({ type: String }) authToken: string = '';
-  @property({ type: Boolean }) disabled: boolean = false;
-  @property({ type: Object }) validationRules: ValidationConfig = {};
-
-  // Event callbacks with error handling
-  @property({ type: Function }) 
-  onSubmit?: (data: FormData, context: SubmissionContext) => Promise<SubmissionResult>;
-  
-  @property({ type: Function }) 
-  onChange?: (fieldId: string, value: unknown, validation: ValidationResult) => void;
-  
-  @property({ type: Function }) 
-  onError?: (error: EmbedyError, context: ErrorContext) => void;
-  
-  @property({ type: Function }) 
-  onLoad?: (component: EmbedyBase, loadTime: number) => void;
-
-  // Lifecycle methods with error boundaries
-  async connectedCallback() {
-    super.connectedCallback();
-    
-    try {
-      await this.initializeComponent();
-      this.dispatchEvent(new CustomEvent('embedy:ready', {
-        detail: { component: this, timestamp: Date.now() }
-      }));
-    } catch (error) {
-      this.handleError(error, 'INITIALIZATION_ERROR');
-    }
-  }
-
-  async disconnectedCallback() {
-    try {
-      await this.cleanup();
-    } catch (error) {
-      console.warn('Cleanup error:', error);
-    }
-    super.disconnectedCallback();
-  }
-
-  // Public API methods
-  async updateTheme(themeConfig: Partial<ThemeConfig>): Promise<void> {
-    try {
-      this.validateThemeConfig(themeConfig);
-      this.theme = { ...this.theme, ...themeConfig };
-      await this.applyTheme();
-    } catch (error) {
-      throw new EmbedyError('THEME_UPDATE_FAILED', {
-        originalError: error,
-        themeConfig,
-        currentTheme: this.theme
-      });
-    }
-  }
-
-  async validate(): Promise<ValidationResult> {
-    try {
-      const result = await this.performValidation();
-      this.dispatchEvent(new CustomEvent('embedy:validation', {
-        detail: result
-      }));
-      return result;
-    } catch (error) {
-      const validationError = new EmbedyError('VALIDATION_FAILED', {
-        originalError: error,
-        formData: this.getFormData()
-      });
-      this.handleError(validationError, 'VALIDATION_ERROR');
-      throw validationError;
-    }
-  }
-
-  async submit(): Promise<SubmissionResult> {
-    try {
-      // Pre-submission validation
-      const validationResult = await this.validate();
-      if (!validationResult.valid) {
-        throw new EmbedyError('VALIDATION_FAILED', {
-          errors: validationResult.errors
-        });
-      }
-
-      // Submit data
-      const formData = this.getFormData();
-      const result = await this.submitData(formData);
-      
-      this.dispatchEvent(new CustomEvent('embedy:submit-success', {
-        detail: { result, formData }
-      }));
-      
-      return result;
-    } catch (error) {
-      const submissionError = new EmbedyError('SUBMISSION_FAILED', {
-        originalError: error,
-        formData: this.getFormData(),
-        validationState: await this.validate().catch(() => null)
-      });
-      
-      this.handleError(submissionError, 'SUBMISSION_ERROR');
-      throw submissionError;
-    }
-  }
-
-  // Error handling
-  private handleError(error: EmbedyError, context: ErrorContext): void {
-    // Log error for debugging
-    console.error('[EMBEDY ERROR]', {
-      type: error.type,
-      message: error.message,
-      context,
-      component: this.tagName,
-      timestamp: Date.now()
-    });
-
-    // Call user-provided error handler
-    if (this.onError) {
-      try {
-        this.onError(error, context);
-      } catch (handlerError) {
-        console.error('Error in user error handler:', handlerError);
-      }
-    }
-
-    // Dispatch error event
-    this.dispatchEvent(new CustomEvent('embedy:error', {
-      detail: { error, context },
-      bubbles: true
-    }));
-
-    // Update UI to show error state
-    this.showErrorState(error);
-  }
-}
-```
+The EmbedyBase class serves as the foundation for all Embedy components, providing standardized configuration properties, event callbacks, and lifecycle management. It includes theme configuration, isolation level control, API endpoint management, and comprehensive error handling. Lifecycle methods handle component initialization and cleanup with proper error boundaries, while public API methods support theme updates, validation, and form submission with detailed error reporting and event dispatching.
 
 #### Error Types and Handling
-```typescript
-// Comprehensive error system
-export class EmbedyError extends Error {
-  constructor(
-    public type: ErrorType,
-    public details: ErrorDetails = {},
-    message?: string
-  ) {
-    super(message || EmbedyError.getDefaultMessage(type));
-    this.name = 'EmbedyError';
-  }
-
-  static getDefaultMessage(type: ErrorType): string {
-    const messages: Record<ErrorType, string> = {
-      'INITIALIZATION_ERROR': 'Failed to initialize component',
-      'VALIDATION_FAILED': 'Form validation failed',
-      'SUBMISSION_FAILED': 'Form submission failed',
-      'THEME_UPDATE_FAILED': 'Failed to update theme',
-      'NETWORK_ERROR': 'Network request failed',
-      'SECURITY_VIOLATION': 'Security policy violation',
-      'CONFIGURATION_ERROR': 'Invalid configuration provided'
-    };
-    return messages[type] || 'Unknown error occurred';
-  }
-
-  toJSON() {
-    return {
-      type: this.type,
-      message: this.message,
-      details: this.details,
-      stack: this.stack,
-      timestamp: Date.now()
-    };
-  }
-}
-
-// Error boundaries for React components
-export class EmbedyErrorBoundary extends React.Component<
-  ErrorBoundaryProps,
-  ErrorBoundaryState
-> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return {
-      hasError: true,
-      error: error instanceof EmbedyError ? error : new EmbedyError(
-        'COMPONENT_ERROR',
-        { originalError: error }
-      )
-    };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log error to monitoring service
-    this.logErrorToService(error, errorInfo);
-    
-    // Call user-provided error handler
-    if (this.props.onError) {
-      this.props.onError(error, errorInfo);
-    }
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback || (
-        <div className="embedy-error-state">
-          <h3>Something went wrong</h3>
-          <p>Please try refreshing the page or contact support.</p>
-          <details>
-            <summary>Error details</summary>
-            <pre>{JSON.stringify(this.state.error?.toJSON(), null, 2)}</pre>
-          </details>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-```
+The comprehensive error system includes the EmbedyError class with typed error categories, detailed error information, and JSON serialization capabilities. Error types cover initialization, validation, submission, theming, network, security, and configuration issues with appropriate default messages. The EmbedyErrorBoundary provides React component error handling with automatic error conversion, monitoring service integration, fallback UI rendering, and user-provided error handler support.
 
 #### Network and API Layer
-```typescript
-// Robust API client with retry logic and error handling
-export class EmbedyApiClient {
-  private baseUrl: string;
-  private authToken: string;
-  private retryConfig: RetryConfig;
-
-  constructor(config: ApiClientConfig) {
-    this.baseUrl = config.baseUrl;
-    this.authToken = config.authToken;
-    this.retryConfig = config.retryConfig || {
-      maxRetries: 3,
-      backoffMs: 1000,
-      retryableStatuses: [408, 429, 500, 502, 503, 504]
-    };
-  }
-
-  async submitForm(formData: FormData): Promise<SubmissionResult> {
-    return this.retryRequest(async () => {
-      const response = await fetch(`${this.baseUrl}/submit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.authToken}`,
-          'X-Embedy-Version': '1.0'
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        throw new EmbedyError('SUBMISSION_FAILED', {
-          status: response.status,
-          statusText: response.statusText,
-          url: response.url
-        });
-      }
-
-      return response.json();
-    });
-  }
-
-  private async retryRequest<T>(
-    requestFn: () => Promise<T>
-  ): Promise<T> {
-    let lastError: Error;
-    
-    for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
-      try {
-        return await requestFn();
-      } catch (error) {
-        lastError = error;
-        
-        // Don't retry on client errors (4xx except specific ones)
-        if (error instanceof EmbedyError && 
-            error.details.status >= 400 && 
-            error.details.status < 500 &&
-            !this.retryConfig.retryableStatuses.includes(error.details.status)) {
-          throw error;
-        }
-
-        // Wait before retry (exponential backoff)
-        if (attempt < this.retryConfig.maxRetries) {
-          const delay = this.retryConfig.backoffMs * Math.pow(2, attempt);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    throw new EmbedyError('NETWORK_ERROR', {
-      originalError: lastError,
-      attempts: this.retryConfig.maxRetries + 1
-    });
-  }
-}
-```
+The EmbedyApiClient provides robust form submission with configurable retry logic, authentication handling, and comprehensive error management. It includes automatic retry with exponential backoff for transient errors while avoiding retries for permanent client errors. The client supports configurable base URLs, authentication tokens, retry policies, and proper error classification for different HTTP status codes.
 
 ### Integration Examples with Error Handling
 
 #### React Integration
-```typescript
-// Complete React integration example
-import { EmbedyProvider, InvoiceForm, EmbedyErrorBoundary } from '@embedy/react';
-
-function App() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<EmbedyError | null>(null);
-
-  const handleSubmit = async (data: FormData) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const result = await apiClient.submitForm(data);
-      console.log('Form submitted successfully:', result);
-      // Handle success (redirect, show success message, etc.)
-    } catch (error) {
-      console.error('Form submission failed:', error);
-      setError(error as EmbedyError);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleError = (error: EmbedyError, context: ErrorContext) => {
-    // Custom error handling logic
-    setError(error);
-    
-    // Send error to monitoring service
-    errorMonitoring.captureError(error, context);
-  };
-
-  return (
-    <EmbedyErrorBoundary 
-      onError={handleError}
-      fallback={<ErrorFallback />}>
-      <EmbedyProvider 
-        theme={customTheme}
-        apiConfig={{
-          baseUrl: process.env.REACT_APP_EMBEDY_API_URL,
-          authToken: process.env.REACT_APP_EMBEDY_TOKEN
-        }}>
-        
-        <InvoiceForm
-          onSubmit={handleSubmit}
-          onError={handleError}
-          loading={loading}
-          disabled={loading}
-          validationRules={{
-            realTimeValidation: true,
-            showErrorsOnBlur: true
-          }}
-        />
-        
-        {error && (
-          <ErrorDisplay 
-            error={error} 
-            onRetry={() => setError(null)} 
-          />
-        )}
-      </EmbedyProvider>
-    </EmbedyErrorBoundary>
-  );
-}
-```
+React integration utilizes the EmbedyProvider for configuration management, EmbedyErrorBoundary for error handling, and form components with comprehensive state management. The implementation includes loading states, error handling with monitoring service integration, theme configuration via environment variables, validation rule configuration, and error display with retry functionality. Components support standard React patterns including hooks, error boundaries, and provider context.
 
 #### Web Components Integration
-```html
-<!-- Complete web components integration -->
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const invoiceForm = document.querySelector('embedy-invoice-form');
-  
-  // Configure error handling
-  invoiceForm.onError = (error, context) => {
-    console.error('Embedy error:', error);
-    
-    // Show user-friendly error message
-    showErrorToast(error.message);
-    
-    // Send to error tracking
-    if (window.Sentry) {
-      window.Sentry.captureException(error);
-    }
-  };
-  
-  // Configure submission handling
-  invoiceForm.onSubmit = async (data, context) => {
-    try {
-      const response = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      showSuccessMessage('Invoice created successfully!');
-      return result;
-    } catch (error) {
-      // Error will be handled by onError callback
-      throw error;
-    }
-  };
-  
-  // Handle component events
-  invoiceForm.addEventListener('embedy:validation', (event) => {
-    const { valid, errors } = event.detail;
-    updateValidationUI(valid, errors);
-  });
-  
-  invoiceForm.addEventListener('embedy:error', (event) => {
-    const { error, context } = event.detail;
-    logErrorForDebugging(error, context);
-  });
-});
-
-// Utility functions
-function showErrorToast(message) {
-  // Implementation depends on your toast library
-  console.error('Error:', message);
-}
-
-function showSuccessMessage(message) {
-  // Implementation depends on your notification system
-  console.log('Success:', message);
-}
-
-function updateValidationUI(valid, errors) {
-  // Update form validation state in UI
-  const submitButton = document.querySelector('#submit-button');
-  submitButton.disabled = !valid;
-}
-</script>
-
-<embedy-invoice-form 
-  api-endpoint="/api/invoices"
-  theme="custom-brand"
-  isolation-level="shadow">
-</embedy-invoice-form>
-```
+Web components integration uses vanilla JavaScript with DOM event listeners for component interaction. The implementation includes error handling with toast notifications and error tracking service integration, form submission with fetch API and proper error handling, event listener configuration for validation and error events, and utility functions for user feedback. Components are configured via HTML attributes for API endpoints, theming, and isolation levels.
 
 ## Implementation Phases
 

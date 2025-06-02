@@ -109,6 +109,9 @@ Features load based on environment capabilities:
 - Follow conventional commit format when applicable (feat:, fix:, docs:, refactor:, etc.)
 - Commit after each completed todo item to maintain clear project history
 - Never commit broken code - ensure tests pass before committing
+- Create descriptive commits that provide context for future developers
+- Include the impact and reasoning behind changes in commit messages
+- Avoid generic messages like "Update files" or "Fix bug" without context
 
 ## Producer vs Consumer Separation
 
