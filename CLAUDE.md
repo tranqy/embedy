@@ -135,3 +135,83 @@ The system supports three integration patterns:
 1. **Drop-in**: Minimal setup with default branding via CDN
 2. **Fully Branded**: Complete white-label customization (visual theming only, not structural changes)
 3. **Enterprise Security**: Maximum isolation with custom authentication and CSP compliance
+
+## Documentation Structure
+
+### Core Documentation Files
+- **docs/overview.md**: High-level architectural vision and system capabilities
+- **docs/technical-requirements.md**: Flexible requirements focusing on "what" and "why" rather than "how"
+- **docs/code-examples.md**: Concrete implementation examples for reference
+- **docs/multi-target-architecture.md**: Web components and React integration patterns
+- **docs/build-system-architecture.md**: Progressive loading and bundle optimization details
+- **docs/security-architecture.md**: Comprehensive security implementation guidance
+- **docs/unanswered-questions.md**: Critical architectural decisions requiring team input
+
+### Documentation Philosophy
+The documentation intentionally avoids prescriptive implementation details to give implementers freedom within architectural constraints. Code examples are separated from requirements to serve as reference rather than mandatory patterns.
+
+## Key Architectural Decisions
+
+### Progressive Loading Strategy
+- Core bundle must remain under 18KB gzipped
+- Features load based on device capabilities (bandwidth, memory, browser support)
+- Polyfills load conditionally to avoid penalizing modern browsers
+- Bundle splitting by feature enables optimal caching
+
+### Security Model
+- Three isolation levels adapt to environment constraints automatically
+- CSP compliance is mandatory for payment and high-security environments
+- All cross-origin communication uses Postmate for security validation
+- Privacy features include client-side encryption for sensitive fields
+
+### Performance Requirements
+- Time to Interactive: < 3 seconds on 3G networks
+- Component render: < 100ms for complex forms
+- Memory usage: < 15MB for complete suite
+- Automatic performance regression detection in CI/CD
+
+## Areas Requiring Decisions
+
+### Critical Open Questions
+1. **JSON Schema vs TypeScript**: Which source of truth for form definitions?
+2. **State Management**: Component-local or centralized store pattern?
+3. **Build Output**: Single bundle with tree-shaking or pre-split packages?
+4. **Theme Inheritance**: How do component themes inherit from global themes?
+5. **Testing Strategy**: Unit tests only or include visual regression testing?
+
+### Future Considerations
+- WebAssembly integration for compute-intensive validations
+- Service Worker support for offline functionality
+- Micro-frontend architecture compatibility
+- Server-side rendering support for SEO requirements
+
+## Development Workflow Recommendations
+
+### Component Development Process
+1. Start with Lit web component implementation
+2. Generate React wrapper automatically via build tools
+3. Test all three deployment methods (native, React, iframe)
+4. Validate security isolation at each level
+5. Performance test with throttled network conditions
+
+### Testing Approach
+- Unit tests for all business logic
+- Integration tests for cross-component communication
+- Security tests for isolation boundaries
+- Performance benchmarks for bundle size and runtime
+- Accessibility testing with automated tools
+
+## Implementation Priorities
+
+### Phase 1 Focus Areas
+- Core form components (input, select, textarea)
+- Basic theming system with CSS custom properties
+- Security adapter for environment detection
+- Build system with progressive loading
+
+### Technical Debt Prevention
+- Maintain strict TypeScript types from day one
+- Document architectural decisions in ADRs
+- Regular bundle size audits
+- Security review for each new component
+- Performance profiling in CI pipeline
