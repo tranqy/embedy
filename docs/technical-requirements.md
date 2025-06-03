@@ -160,40 +160,18 @@ Privacy management includes configurable data processing basis, retention polici
 CORS policies are configured differently for production and development environments. Production configuration uses strict origin allowlists, limited HTTP methods, specific headers, and appropriate cache settings. Development configuration allows broader access for testing while maintaining credential security. The CORSValidator ensures proper origin validation and header verification for all cross-origin requests.
 
 ##### Security Monitoring and Alerting
-```typescript
-class SecurityMonitor {
-  private metrics: SecurityMetrics;
-  private alertThresholds: AlertThresholds;
-  
-  logSecurityEvent(event: SecurityEvent) {
-    // Log security events for monitoring
-    console.warn('[EMBEDY SECURITY]', {
-      type: event.type,
-      severity: event.severity,
-      origin: event.origin,
-      timestamp: Date.now(),
-      userAgent: navigator.userAgent,
-      details: event.details
-    });
-    
-    // Send to monitoring service
-    this.sendToMonitoring(event);
-    
-    // Check if immediate action required
-    if (event.severity === 'high') {
-      this.triggerSecurityAlert(event);
-    }
-  }
-  
-  private triggerSecurityAlert(event: SecurityEvent) {
-    // Disable further operations if severe security threat
-    if (event.type === 'MALICIOUS_CONTENT' || event.type === 'ORIGIN_VIOLATION') {
-      this.disableEmbeddedComponent();
-      this.notifyParentWindow('SECURITY_ALERT', event);
-    }
-  }
-}
-```
+
+The security monitoring system must provide comprehensive logging, real-time threat detection, and automated response capabilities. Security events should be logged with appropriate detail levels, sent to monitoring services, and trigger immediate action for high-severity threats.
+
+Key monitoring requirements:
+- Event logging with severity classification
+- Integration with external monitoring services  
+- Automated threat response for critical events
+- Real-time alerting for security violations
+- Component disabling for malicious content detection
+- Parent window notification of security alerts
+
+See `docs/code-examples.md#security-monitoring-implementation` for reference implementation patterns.
 
 **Postmate Implementation**: Parent-child iframe communication uses Postmate's promise-based API with container targeting, URL specification, and custom styling. The parent listens for events from the child iframe and can call exposed methods for theme updates. The child iframe implementation creates a model with exposed methods for parent communication and can emit events back to the parent for data transmission.
 

@@ -1971,3 +1971,86 @@ async function initializeEmbedy() {
 }
 ```
 EOF < /dev/null
+### Security Monitoring Implementation
+
+```typescript
+class SecurityMonitor {
+  private metrics: SecurityMetrics;
+  private alertThresholds: AlertThresholds;
+  
+  logSecurityEvent(event: SecurityEvent) {
+    // Log security events for monitoring
+    console.warn('[EMBEDY SECURITY]', {
+      type: event.type,
+      severity: event.severity,
+      origin: event.origin,
+      timestamp: Date.now(),
+      userAgent: navigator.userAgent,
+      details: event.details
+    });
+    
+    // Send to monitoring service
+    this.sendToMonitoring(event);
+    
+    // Check if immediate action required
+    if (event.severity === 'high') {
+      this.triggerSecurityAlert(event);
+    }
+  }
+  
+  private triggerSecurityAlert(event: SecurityEvent) {
+    // Disable further operations if severe security threat
+    if (event.type === 'MALICIOUS_CONTENT' || event.type === 'ORIGIN_VIOLATION') {
+      this.disableEmbeddedComponent();
+      this.notifyParentWindow('SECURITY_ALERT', event);
+    }
+  }
+  
+  private sendToMonitoring(event: SecurityEvent) {
+    // Send to external monitoring services
+    if (window.fetch && this.metrics.monitoringEndpoint) {
+      fetch(this.metrics.monitoringEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.metrics.apiKey}`
+        },
+        body: JSON.stringify({
+          ...event,
+          componentId: this.getComponentId(),
+          sessionId: this.getSessionId(),
+          environment: this.getEnvironment()
+        })
+      }).catch(error => {
+        console.error('Failed to send security event to monitoring:', error);
+      });
+    }
+  }
+  
+  private disableEmbeddedComponent() {
+    // Safely disable component functionality
+    const components = document.querySelectorAll('[data-embedy]');
+    components.forEach(component => {
+      component.setAttribute('disabled', 'true');
+      component.innerHTML = '<div class="embedy-security-disabled">Component disabled due to security violation</div>';
+    });
+  }
+  
+  private notifyParentWindow(type: string, event: SecurityEvent) {
+    // Notify parent window of security alert
+    if (window.parent && window.parent \!== window) {
+      try {
+        window.parent.postMessage({
+          type: 'EMBEDY_SECURITY_ALERT',
+          alertType: type,
+          event: event,
+          timestamp: Date.now()
+        }, '*'); // In production, use specific origin
+      } catch (error) {
+        console.error('Failed to notify parent window:', error);
+      }
+    }
+  }
+}
+```
+EOF < /dev/null
