@@ -1,454 +1,154 @@
-# Multi-Target Architecture Implementation
+# Multi-Target Architecture
 
-This document provides detailed implementation guidance for Embedy's multi-target component system that enables deployment across web components, React components, and iframe sandboxes.
+This document outlines the conceptual architecture that enables Embedy components to seamlessly deploy across web components, React components, and iframe sandboxes while maintaining consistent functionality and developer experience.
+
+## Core Philosophy
+
+The multi-target architecture is built on the principle of "write once, deploy everywhere" - components are authored once using modern web standards and automatically adapted to work in any JavaScript environment. This approach eliminates the need for manual porting between frameworks while ensuring optimal integration patterns for each deployment method.
 
 ## Component Interface Foundation
 
-All Embedy components implement a shared interface to ensure consistency across deployment methods:
+At the heart of the multi-target system is a unified component interface that defines the contract all Embedy components must fulfill. This interface ensures that regardless of how a component is deployed, it will expose the same core functionality, properties, and events.
 
-```typescript
-// core/component-interface.ts
-export interface EmbedyComponentInterface {
-  // Core functionality that must work in all deployment methods
-  validate(): Promise<ValidationResult>;
-  submit(): Promise<SubmissionResult>;
-  updateTheme(theme: Partial<ThemeConfig>): Promise<void>;
-  reset(): void;
-  
-  // Properties that must be supported across all methods
-  theme: ThemeConfig;
-  isolationLevel: IsolationLevel;
-  disabled: boolean;
-  
-  // Events that must be emitted consistently
-  onValidationChange?: (result: ValidationResult) => void;
-  onSubmit?: (data: FormData) => Promise<SubmissionResult>;
-  onError?: (error: EmbedyError) => void;
-}
-```
+The interface establishes:
+- **Core Methods**: Standard operations like validate, submit, reset, and updateTheme that work identically across all deployment methods
+- **Universal Properties**: Configuration options like theme, isolation level, and disabled state that behave consistently
+- **Event Contract**: A standardized event system that translates seamlessly between custom events, React callbacks, and postMessage communication
+
+This shared interface acts as the foundation for feature parity across deployment methods, ensuring developers can switch between web components, React components, and iframe deployments without changing their integration code.
 
 ## Automatic React Wrapper Generation
 
+One of the key innovations in the multi-target architecture is the automatic generation of React wrappers from web components. This system eliminates the traditional burden of maintaining separate React and web component implementations.
+
 ### Build-Time Code Generation
 
-React wrappers are automatically generated from Lit components during the build process:
+The React wrapper generation happens at build time through an intelligent code generation system that:
 
-```typescript
-// build-tools/react-wrapper-generator.ts
-interface ReactWrapperConfig {
-  litComponent: string;
-  reactComponentName: string;
-  props: PropertyDefinition[];
-  events: EventDefinition[];
-}
+1. **Analyzes Web Components**: Extracts property definitions, event signatures, and type information from Lit components
+2. **Generates React Components**: Creates idiomatic React components that properly handle props, refs, and lifecycle
+3. **Preserves Type Safety**: Maintains full TypeScript support with proper type inference and checking
+4. **Handles Edge Cases**: Manages ref forwarding, event delegation, and property synchronization automatically
 
-class ReactWrapperGenerator {
-  generateWrapper(config: ReactWrapperConfig): string {
-    return `
-import React, { useRef, useEffect, forwardRef } from 'react';
-import { ${config.litComponent} } from '../web-components/${config.litComponent}';
+### Type-Safe Property System
 
-// Ensure web component is registered
-if (!customElements.get('${kebabCase(config.litComponent)}')) {
-  customElements.define('${kebabCase(config.litComponent)}', ${config.litComponent});
-}
+The architecture includes a sophisticated property decoration system that captures type information at design time. This metadata is used during the build process to generate React components with proper TypeScript interfaces, ensuring type safety across framework boundaries.
 
-export interface ${config.reactComponentName}Props {
-  ${this.generatePropTypes(config.props)}
-  ${this.generateEventProps(config.events)}
-}
-
-export const ${config.reactComponentName} = forwardRef<
-  ${config.litComponent},
-  ${config.reactComponentName}Props
->((props, ref) => {
-  const elementRef = useRef<${config.litComponent}>(null);
-  
-  // Forward ref to the actual web component
-  useEffect(() => {
-    if (ref && elementRef.current) {
-      if (typeof ref === 'function') {
-        ref(elementRef.current);
-      } else {
-        ref.current = elementRef.current;
-      }
-    }
-  }, [ref]);
-  
-  // Sync props to web component properties
-  useEffect(() => {
-    const element = elementRef.current;
-    if (element) {
-      ${this.generatePropSync(config.props)}
-    }
-  }, [${config.props.map(p => `props.${p.name}`).join(', ')}]);
-  
-  // Setup event listeners
-  useEffect(() => {
-    const element = elementRef.current;
-    if (element) {
-      ${this.generateEventListeners(config.events)}
-      
-      return () => {
-        ${this.generateEventCleanup(config.events)}
-      };
-    }
-  }, [${config.events.map(e => `props.${e.reactPropName}`).join(', ')}]);
-  
-  return (
-    <${kebabCase(config.litComponent)}
-      ref={elementRef}
-      {...this.filterDOMProps(props)}
-    />
-  );
-});
-`;
-  }
-  
-  private generatePropSync(props: PropertyDefinition[]): string {
-    return props.map(prop => 
-      `element.${prop.name} = props.${prop.name};`
-    ).join('\n      ');
-  }
-  
-  private generateEventListeners(events: EventDefinition[]): string {
-    return events.map(event => `
-      const ${event.handlerName} = (e: CustomEvent) => {
-        if (props.${event.reactPropName}) {
-          props.${event.reactPropName}(e.detail);
-        }
-      };
-      element.addEventListener('${event.nativeName}', ${event.handlerName});`
-    ).join('\n');
-  }
-}
-```
-
-### Type-Safe Property Decoration
-
-The `@embedyProperty` decorator captures type information for React wrapper generation:
-
-```typescript
-// core/embedy-property.ts
-export function embedyProperty<T>(options?: PropertyOptions) {
-  return function(target: any, propertyKey: string) {
-    // Store type information for React wrapper generation
-    const existingProps = Reflect.getMetadata('embedy:props', target) || [];
-    existingProps.push({
-      name: propertyKey,
-      type: Reflect.getMetadata('design:type', target, propertyKey),
-      options
-    });
-    Reflect.setMetadata('embedy:props', existingProps, target);
-    
-    // Apply Lit property decorator
-    return property(options)(target, propertyKey);
-  };
-}
-
-// Enhanced component definition with automatic type inference
-export function defineEmbedyComponent<T extends BaseComponentProps>(
-  tagName: string,
-  componentClass: Constructor<LitElement>
-) {
-  // Extract prop types from the component class
-  const propTypes = Reflect.getMetadata('embedy:props', componentClass.prototype);
-  
-  // Generate TypeScript definitions for React wrapper
-  generateReactTypes(tagName, propTypes);
-  
-  // Register web component
-  customElements.define(tagName, componentClass);
-  
-  return componentClass as Constructor<LitElement & T>;
-}
-```
+Key benefits of this approach:
+- **Zero Runtime Overhead**: All wrapper generation happens at build time
+- **Framework-Native Patterns**: Generated React components follow React best practices
+- **Automatic Updates**: Changes to web components are automatically reflected in React wrappers
+- **Type Inference**: TypeScript types flow seamlessly from web components to React
 
 ## Feature Parity Management
 
+Ensuring consistent functionality across different deployment methods requires sophisticated capability detection and feature adaptation. The architecture includes a comprehensive system for managing feature parity while respecting the unique capabilities of each deployment environment.
+
 ### Capability Detection System
 
-Different deployment methods have different capabilities that need to be detected and adapted:
+The capability detection system automatically identifies what features are available in each deployment context:
 
-```typescript
-// core/feature-capability-manager.ts
-export class FeatureCapabilityManager {
-  private capabilities = new Map<string, boolean>();
-  
-  constructor(deploymentMethod: 'web-component' | 'react' | 'iframe') {
-    this.detectCapabilities(deploymentMethod);
-  }
-  
-  private detectCapabilities(method: string) {
-    switch (method) {
-      case 'web-component':
-        this.capabilities.set('directDOMAccess', true);
-        this.capabilities.set('shadowDOM', true);
-        this.capabilities.set('customEvents', true);
-        this.capabilities.set('cssCustomProperties', true);
-        break;
-      case 'react':
-        this.capabilities.set('reactHooks', true);
-        this.capabilities.set('reactContext', true);
-        this.capabilities.set('jsxProps', true);
-        this.capabilities.set('stateManagement', true);
-        break;
-      case 'iframe':
-        this.capabilities.set('postMessage', true);
-        this.capabilities.set('sandboxSecurity', true);
-        this.capabilities.set('crossOrigin', true);
-        this.capabilities.set('isolatedContext', true);
-        break;
-    }
-  }
-  
-  // Adapt features based on deployment method capabilities
-  adaptFeature(featureName: string, implementations: FeatureImplementations) {
-    if (this.capabilities.get('reactHooks') && implementations.react) {
-      return implementations.react;
-    } else if (this.capabilities.get('postMessage') && implementations.iframe) {
-      return implementations.iframe;
-    } else {
-      return implementations.webComponent;
-    }
-  }
-  
-  // Check if a specific capability is available
-  hasCapability(capability: string): boolean {
-    return this.capabilities.get(capability) || false;
-  }
-}
+**Web Component Capabilities**:
+- Direct DOM access for optimal performance
+- Shadow DOM for style isolation
+- Custom events for native browser integration
+- CSS custom properties for theming
 
-// Feature implementation variants
-interface FeatureImplementations {
-  webComponent: () => any;
-  react?: () => any;
-  iframe?: () => any;
-}
+**React Component Capabilities**:
+- React hooks for state management
+- Context API for theme propagation
+- JSX props for configuration
+- Virtual DOM for efficient updates
 
-// Example usage
-const themeManager = capabilityManager.adaptFeature('themeManagement', {
-  webComponent: () => new CSSCustomPropertyThemeManager(),
-  react: () => new ReactContextThemeManager(),
-  iframe: () => new PostMessageThemeManager()
-});
-```
+**Iframe Sandbox Capabilities**:
+- PostMessage for secure communication
+- Complete isolation from host page
+- Cross-origin deployment support
+- Independent security context
+
+### Adaptive Feature Implementation
+
+The architecture intelligently selects the appropriate implementation for each feature based on the deployment context. For example:
+- **Theme Management**: Uses CSS custom properties in web components, React Context in React apps, and postMessage in iframes
+- **State Management**: Leverages reactive properties in web components, hooks in React, and message passing in iframes
+- **Event Handling**: Employs custom events for web components, callbacks for React, and postMessage for iframes
+
+This adaptive approach ensures optimal performance and natural integration patterns for each deployment method while maintaining functional equivalence.
 
 ## React Adaptation Layer
 
-For features that can't be directly translated to React patterns, we use adaptation layers:
+The React adaptation layer bridges the gap between web component patterns and React idioms, ensuring that components feel native to React developers while maintaining the benefits of the underlying web component architecture.
 
-```typescript
-// adapters/react-adaptation-layer.ts
-export class ReactAdaptationLayer {
-  // Handle shadow DOM in React (where shadow DOM isn't native)
-  static adaptShadowDOM(Component: React.ComponentType) {
-    return React.forwardRef((props, ref) => {
-      const containerRef = useRef<HTMLDivElement>(null);
-      const shadowRef = useRef<ShadowRoot | null>(null);
-      
-      useEffect(() => {
-        if (containerRef.current && !shadowRef.current) {
-          // Create shadow DOM for React component
-          shadowRef.current = containerRef.current.attachShadow({ mode: 'open' });
-          
-          // Inject styles into shadow DOM
-          const styleSheet = new CSSStyleSheet();
-          styleSheet.replaceSync(getComponentStyles());
-          shadowRef.current.adoptedStyleSheets = [styleSheet];
-        }
-      }, []);
-      
-      return (
-        <div ref={containerRef}>
-          {/* Render React component inside shadow DOM */}
-          {shadowRef.current && 
-            ReactDOM.createPortal(<Component {...props} ref={ref} />, shadowRef.current)
-          }
-        </div>
-      );
-    });
-  }
-  
-  // Handle custom events in React
-  static adaptCustomEvents(webComponentRef: RefObject<HTMLElement>, eventMap: EventMap) {
-    useEffect(() => {
-      const element = webComponentRef.current;
-      if (!element) return;
-      
-      const eventHandlers = new Map();
-      
-      Object.entries(eventMap).forEach(([eventName, reactHandler]) => {
-        const handler = (event: CustomEvent) => {
-          reactHandler(event.detail);
-        };
-        
-        element.addEventListener(eventName, handler);
-        eventHandlers.set(eventName, handler);
-      });
-      
-      return () => {
-        eventHandlers.forEach((handler, eventName) => {
-          element?.removeEventListener(eventName, handler);
-        });
-      };
-    }, [webComponentRef.current, eventMap]);
-  }
-  
-  // Translate Lit reactive properties to React state
-  static adaptReactiveProperties<T extends Record<string, any>>(
-    initialProps: T,
-    webComponentRef: RefObject<HTMLElement & T>
-  ): [T, (updates: Partial<T>) => void] {
-    const [state, setState] = useState<T>(initialProps);
-    
-    const updateProperties = useCallback((updates: Partial<T>) => {
-      setState(prev => ({ ...prev, ...updates }));
-      
-      // Sync to web component
-      if (webComponentRef.current) {
-        Object.entries(updates).forEach(([key, value]) => {
-          (webComponentRef.current as any)[key] = value;
-        });
-      }
-    }, [webComponentRef]);
-    
-    return [state, updateProperties];
-  }
-}
-```
+### Key Adaptation Strategies
+
+**Shadow DOM in React**: While React doesn't natively support shadow DOM, the adaptation layer provides shadow DOM encapsulation for React components when needed. This is particularly valuable for maintaining style isolation in complex applications.
+
+**Event System Translation**: The layer automatically translates between web component custom events and React's callback prop pattern. This ensures that React developers can use familiar patterns like `onChange` and `onSubmit` while the underlying web component uses custom events.
+
+**Property Synchronization**: Reactive properties from Lit components are seamlessly synchronized with React state, ensuring that updates flow properly through React's rendering pipeline while maintaining the web component's internal state management.
+
+**Lifecycle Coordination**: The adaptation layer manages the coordination between React lifecycle methods and web component lifecycle callbacks, ensuring proper initialization, updates, and cleanup across framework boundaries.
+
+### Benefits of the Adaptation Approach
+
+1. **Framework-Native Experience**: React developers work with components that feel like native React components
+2. **Preserved Web Standards**: The underlying web components remain standards-compliant and framework-agnostic
+3. **Performance Optimization**: The adaptation layer is optimized to minimize overhead and prevent unnecessary re-renders
+4. **Progressive Enhancement**: Features are progressively enhanced based on React capabilities while maintaining baseline functionality
 
 ## Type System Integration
 
-### Shared Type Definitions
+A unified type system ensures type safety across all deployment methods, providing developers with consistent interfaces and excellent IDE support regardless of how components are deployed.
 
-Types are shared across all deployment methods through a common type definition system:
+### Shared Type Architecture
 
-```typescript
-// types/shared-component-types.ts
-export interface BaseComponentProps {
-  theme?: Partial<ThemeConfig>;
-  isolationLevel?: IsolationLevel;
-  disabled?: boolean;
-  className?: string;
-  id?: string;
-}
+The type system is built on several key principles:
 
-export interface FormComponentProps extends BaseComponentProps {
-  validationRules?: ValidationConfig;
-  onSubmit?: (data: FormData) => Promise<SubmissionResult>;
-  onChange?: (fieldId: string, value: unknown) => void;
-  onValidation?: (result: ValidationResult) => void;
-}
+1. **Single Source of Truth**: Component types are defined once and automatically propagated to all deployment methods
+2. **Framework-Specific Extensions**: Each deployment method can extend base types with framework-specific properties
+3. **Type Inference**: The system automatically infers types from component implementations
+4. **Build-Time Validation**: Type checking happens at build time to catch integration errors early
 
-// Utility type to extract props from web component
-export type ExtractComponentProps<T> = T extends LitElement 
-  ? { [K in keyof T]: T[K] extends Function ? T[K] : T[K] }
-  : never;
+### Type Flow Across Boundaries
 
-// Auto-generate React prop types from web component
-export type ReactPropsFromWebComponent<T extends LitElement> = 
-  ExtractComponentProps<T> & {
-    // Add React-specific props
-    children?: React.ReactNode;
-    className?: string;
-    style?: React.CSSProperties;
-  };
-```
+Types flow seamlessly from web components to React components through the build process:
+- Property decorators capture type information from web components
+- Build tools generate TypeScript interfaces for React components
+- Runtime validation ensures type safety in production
+- IDE support provides autocomplete and type checking across frameworks
 
-### Usage Example
+## Implementation Benefits
 
-Here's how a complete component is implemented with multi-target support:
+The multi-target architecture delivers significant benefits:
 
-```typescript
-// components/invoice-form/invoice-form.ts
-@defineEmbedyComponent<InvoiceFormProps>('embedy-invoice-form', InvoiceFormComponent)
-export class InvoiceFormComponent extends EmbedyBase implements EmbedyComponentInterface {
-  @embedyProperty({ type: String })
-  apiEndpoint: string = '';
-  
-  @embedyProperty({ type: Object })
-  validationRules: ValidationConfig = {};
-  
-  @embedyProperty({ type: Function })
-  onSubmit?: (data: FormData) => Promise<SubmissionResult>;
-  
-  async validate(): Promise<ValidationResult> {
-    // Implementation that works across all deployment methods
-    const result = await this.validator.validate(this.getFormData());
-    this.dispatchEvent(new CustomEvent('embedy:validation', { detail: result }));
-    return result;
-  }
-  
-  async submit(): Promise<SubmissionResult> {
-    const validationResult = await this.validate();
-    if (!validationResult.valid) {
-      throw new EmbedyError('VALIDATION_FAILED', { errors: validationResult.errors });
-    }
-    
-    const formData = this.getFormData();
-    if (this.onSubmit) {
-      return await this.onSubmit(formData);
-    }
-    
-    // Default submission logic
-    return await this.apiClient.submitForm(formData);
-  }
-  
-  render() {
-    return html`
-      <div class="invoice-form">
-        <!-- Component template that works in all contexts -->
-      </div>
-    `;
-  }
-}
+### For Developers
+1. **Write Once**: Author components once using modern web standards
+2. **Deploy Everywhere**: Components work in any JavaScript environment
+3. **Type Safety**: Full TypeScript support across all deployment methods
+4. **Natural Integration**: Components follow the idioms of each framework
+5. **Progressive Enhancement**: Features adapt to available capabilities
 
-// Auto-generated React wrapper (created during build)
-export const InvoiceForm = ReactAdaptationLayer.adaptShadowDOM(
-  React.forwardRef<HTMLElement, InvoiceFormProps>((props, ref) => {
-    const webComponentRef = useRef<InvoiceFormComponent>(null);
-    
-    // Adapt custom events to React callbacks
-    ReactAdaptationLayer.adaptCustomEvents(webComponentRef, {
-      'embedy:submit': props.onSubmit,
-      'embedy:validation': props.onValidation,
-      'embedy:error': props.onError
-    });
-    
-    // Adapt reactive properties
-    const [componentState, updateComponent] = ReactAdaptationLayer.adaptReactiveProperties(
-      { 
-        theme: props.theme, 
-        disabled: props.disabled,
-        validationRules: props.validationRules 
-      },
-      webComponentRef
-    );
-    
-    return (
-      <embedy-invoice-form
-        ref={mergeRefs([ref, webComponentRef])}
-        api-endpoint={props.apiEndpoint}
-        {...filterProps(props)}
-      />
-    );
-  })
-);
+### For Applications
+1. **Performance**: Optimal implementation for each deployment context
+2. **Compatibility**: Works with legacy systems and modern frameworks
+3. **Security**: Appropriate isolation levels for different requirements
+4. **Maintainability**: Single codebase reduces maintenance burden
+5. **Future-Proof**: Based on web standards, not framework-specific APIs
 
-// TypeScript interface for React component (auto-generated)
-export interface InvoiceFormProps extends FormComponentProps {
-  apiEndpoint?: string;
-  validationRules?: ValidationConfig;
-}
-```
+### For End Users
+1. **Consistent Experience**: Same functionality regardless of integration method
+2. **Better Performance**: Optimized for each deployment context
+3. **Enhanced Security**: Appropriate isolation based on requirements
+4. **Accessibility**: Standards-based approach ensures accessibility
+5. **Reliability**: Reduced complexity means fewer bugs
 
-This architecture ensures that:
+## Architecture Evolution
 
-1. **Type Safety**: Full TypeScript support across all deployment methods
-2. **Feature Parity**: Core functionality works identically in all contexts
-3. **Framework Integration**: Natural patterns for each framework (React hooks, web component properties, iframe postMessage)
-4. **Automatic Generation**: Minimal manual work to maintain React wrappers
-5. **Adaptation**: Graceful handling of framework-specific features
+The multi-target architecture is designed to evolve with the web platform:
 
-The system automatically detects capabilities and adapts features accordingly, ensuring a consistent developer experience regardless of the chosen deployment method.
+- **New Frameworks**: The pattern can be extended to support new frameworks
+- **Web Standards**: As new standards emerge, they can be incorporated
+- **Performance Improvements**: The architecture can adopt new optimization techniques
+- **Security Enhancements**: New isolation strategies can be added as needed
+
+This forward-looking design ensures that Embedy components will continue to work well as the web platform evolves, protecting the investment in component development while enabling adoption of new technologies as they mature.
